@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# TODO: print usage (-h, --help)
+# TODO: Make timeout a commandline option (not argument)
+
+# USAGE:
+# * Install pdsh (parallel distributed shell)
+# * Copy the loadusersuptime script to a hammer node somewhere included in your PATH.
+# * Modify your username below
+# Then, from your local machine, just execute this script with your username as the argument to the script:
+#   hammerload jll1062
+#
+# You can also add an alias to your .bashrc file that reduces the typing involved:
+#   alias hammerload='hammerload jll1062'
+#
+# Then run it by typing
+#   hammerload
+#
+# Finally, the default timeout value of 10 sec makes this workable on fairly
+# slow connections, but you can modify this for faster connections to return
+# the results more quickly.
+
+DEFAULT_TIMEOUT=10
+
+SSH_USERNAME=$1
+TIMEOUT=$2
+REMOTESCRIPT="loadusersuptime"
+
+#dsh -aMc uptime
+printf "%6s  %5s   %-20s  %s\n" Load Users Uptime Hostname
+printf "%6s  %5s   %-20s  %s\n" ---- ----- -------------------- --------
+pdsh -t 10 -u 10 -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
