@@ -82,8 +82,14 @@ while [[ "x$1" != "x" ]]; do
 	walltime=`get_info "-l walltime=" ${farray[0]}`
 	queue=`get_info "-q" ${farray[0]}`
 	log_file=`get_info "-o" ${farray[0]}`
+	if [[ "x${log_file}" == "x" ]]; then
+		log_file=${PWD}/${farray[0]}.log
+	fi
 	log_file=`dirname ${log_file}`/merged.`basename ${log_file}`
 	name=`get_info "-N" ${farray[0]}`
+	if [[ "x${name}" == "x" ]]; then
+		name=${farray[0]}
+	fi
 	mail_opt=`get_info "-m" ${farray[0]}`
 	if [[ "x${mail_opt}" == "x" ]]; then
 		mail_opt="n"
@@ -126,6 +132,9 @@ EOF
 	for i in `seq 0 $(expr ${GROUP_BY[${GROUP_I}]} - 1 )`; do
 		if [[ -e ${farray[$i]} ]]; then
 			local_logging_file=`get_info "-o" ${farray[$i]}`
+			if [[ "x${local_logging_file}" == "x" ]]; then
+				local_logging_file=${PWD}/${farray[0]}.log
+			fi
 			cat >> ${filename} <<EOF
 bash_run ${farray[$i]} > ${local_logging_file} 2>&1
 EOF
