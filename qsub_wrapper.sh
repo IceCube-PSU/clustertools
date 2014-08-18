@@ -1,7 +1,5 @@
 #!/bin/bash
 
-PATH=$PATH:~jpa14/bin
-
 set_real_size=0
 if [[ "${1}" == "--real_size" ]]; then
 	set_real_size=1
