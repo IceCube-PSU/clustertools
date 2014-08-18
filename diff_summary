@@ -1,0 +1,16 @@
+#!/bin/sh
+
+usage(){
+	echo "Usage: $0 <file1> <file2>"
+	exit 1
+}
+
+[[ "${1}" == "" ]] && usage
+[[ "${2}" == "" ]] && usage
+
+file1=${1}
+file2=${2}
+
+/usr/bin/diff ${file1} ${file2} | awk -v file1="${file1}" -v file2="${file2}" 'BEGIN { lineDEL=0; lineADD=0; }{ if($1=="<") lineDEL+=1; if($1==">") lineADD+=1; }END{ if(lineDEL+lineADD>0){ printf "diff "file1" \\ \n     "file2"\n";printf "       -> lines removed: "lineDEL" lines added: "lineADD"\n"; printf "*******\n" } }'
+
+# vim : filetype=sh syntax=sh
