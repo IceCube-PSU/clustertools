@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# TODO: Add usage
+# TODO: Make timeout a commandline option, not an argument
+
+if [ ! -n "$1" ]
+then
+	user=$USER
+else
+	user=$1
+fi
+
+#test $(( $(users | sed -e 's/[ ]\+/\n/g' | grep $user | wc -l) )) -gt 0 && mytop $user
+test $(( $(ps -ef | grep $user | grep -v grep | wc -l) )) -gt 0 && mytop $user

@@ -23,10 +23,16 @@
 DEFAULT_TIMEOUT=10
 
 SSH_USERNAME=$1
-TIMEOUT=$2
 REMOTESCRIPT="loadusersuptime"
+
+if [ ! -n "$2" ]
+then
+	TIMEOUT=$DEFAULT_TIMEOUT
+else
+	TIMEOUT=$2
+fi
 
 #dsh -aMc uptime
 printf "%6s  %5s   %-20s  %s\n" Load Users Uptime Hostname
 printf "%6s  %5s   %-20s  %s\n" ---- ----- -------------------- --------
-pdsh -t 10 -u 10 -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
+pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n

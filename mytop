@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# TODO: clean this up ... a lot! Pretty crude handling of process ID's, but first shot, so hey...
+
+if [ ! -n "$1" ]
+then
+	pid=`ps --no-headers -e -o pid 2>/dev/null | grep -v $PPID | grep -v $$ | grep -v "sshd" | grep -v "cat" | grep -v grep`
+else
+	pid=`pgrep -u $1 2>/dev/null | grep -v $PPID | grep -v $$ | grep -v "sshd" | grep -v "cat" | grep -v grep`
+fi
+
+
+if [ -n "$pid" ]
+then
+	echo "-- CPU-sort... -----------------------------------------------------------------"
+	echo "$pid" | xargs ps -o "%cpu:5 %mem:5 sz:8 vsz:8 cputime:10 pid:6 ppid:6 sid:6 user comm"  --sort="-%cpu,-cputime,-%mem,-vsz" | head -5
+	echo "-- Memory-sort... --------------------------------------------------------------"
+	echo "$pid" | xargs ps -o "%cpu:5 %mem:5 sz:8 vsz:8 cputime:10 pid:6 ppid:6 sid:6 user comm"  --sort="-%mem,-vsz,-%cpu" | head -5
+	echo ""
+fi

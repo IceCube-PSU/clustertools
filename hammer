@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# TODO: Add usage
+
+SSH_USERNAME=$1
+HAMMER_NODE=$2
+
+if [ ! -n "$2" ]
+then
+	HAMMER_NODE="hammer"
+else
+	HAMMER_NODE="hammer${2}"
+fi
+
+ssh -Y -C ${SSH_USERNAME}@${HAMMER_NODE}.rcc.psu.edu

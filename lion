@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# TODO: Add usage
+
+SSH_USERNAME=$1
+LION_NODE=$2
+
+if [ ! -n "$2" ]
+then
+	LION_NODE="lionxg"
+else
+	LION_NODE="lion${2}"
+fi
+
+ssh -Y -C ${SSH_USERNAME}@${LION_NODE}.rcc.psu.edu

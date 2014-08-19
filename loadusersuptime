@@ -1,0 +1,6 @@
+#/bin/bash
+
+NUSERS=`users | sed -e 's/[ ]\+/\n/g' | sort -u | grep -v $USER | wc -l`
+UPTIME=`uptime | sed -e 's/.*up[ ]\+//' -e 's/,[ ]\+[0-9]*[ ]\+user.*//' -e 's/[ ]/_/g'`
+LOAD=`uptime | sed -e 's/.*load average:[ ]\+[0-9.]\+,[ ]\+[0-9.]\+,[ ]\+//'`
+printf ">>>%s;%s;%s\n" $LOAD $NUSERS $UPTIME

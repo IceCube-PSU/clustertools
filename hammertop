@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# TODO: Add usage
+# TODO: Make timeout a command line option (not argument)
+
+SSH_USERNAME=$1
+DEFAULT_TIMEOUT=10
+
+if [ ! -n "$2" ]
+then
+	TIMEOUT=${DEFAULT_TIMEOUT}
+else
+	TIMEOUT=$2
+fi
+
+command="mytop | cat --number"
+echo $command
+
+pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu "$command" 2>/dev/null | sed -e 's/:\s*/./' | sort --version-sort | sed -e 's/\./++/' | awk -F'++' '{printf "%8s  %s\n", $1, $2}' # | sed -e 's/\.[0-9]\+//'
