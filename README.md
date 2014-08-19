@@ -23,6 +23,7 @@ Generic tools for working with clusters
 
 * File utilities
   - diff_summary
+  - disable_svn: rename all .svn directories beneath the current directory to trick subversion into thinking this is not a repository
 
 * Python utilities
   - pythonGenerics.py: a few functions that are generically handy:

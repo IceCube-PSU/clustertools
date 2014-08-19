@@ -1,0 +1,24 @@
+#!/bin/bash
+
+DISABLED_SUFFIX='-disabled'
+
+usage="$(basename "$0") [-h] [-u] -- disable SVN on this and all sub-directories by moving all .svn directories to .svn${DISABLED_SUFFIX} (or move back to .svn with -u option)"
+
+while getopts 'hu' option; do
+	case "$option" in
+		h) echo "$usage"
+			exit
+			;;
+		u)
+			find . -type d -name ".svn${DISABLED_SUFFIX}" -print0 | while IFS= read -r -d '' SVN_DIRNAME; do
+				NEW_DIRNAME=`sed -e 's/'"${DISABLED_SUFFIX}"'$//' <<< "$SVN_DIRNAME"`
+				mv "$SVN_DIRNAME" "$NEW_DIRNAME"
+			done
+			exit
+			;;
+	esac
+done
+
+find . -type d -name ".svn" -print0 | while IFS= read -r -d '' SVN_DIRNAME; do
+	mv "$SVN_DIRNAME" "${SVN_DIRNAME}${DISABLED_SUFFIX}"
+done
