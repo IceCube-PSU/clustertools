@@ -4,8 +4,6 @@
 # TODO: Make timeout a commandline option (not argument)
 
 # USAGE:
-# * Install pdsh (parallel distributed shell)
-# * Copy the loadusersuptime script to a hammer node somewhere included in your PATH.
 # * Modify your username below
 # Then, from your local machine, just execute this script with your username as the argument to the script:
 #   hammerload jll1062
@@ -22,8 +20,11 @@
 
 DEFAULT_TIMEOUT=10
 
-SSH_USERNAME=$1
-REMOTESCRIPT="loadusersuptime"
+if [[ "x$1" != "x" ]]; then
+	SSH_USERNAME=$1"@"
+else
+	SSH_USERNAME=""
+fi
 
 if [ ! -n "$2" ]
 then
@@ -35,4 +36,14 @@ fi
 #dsh -aMc uptime
 printf "%6s  %5s   %-20s  %s\n" Load Users Uptime Hostname
 printf "%6s  %5s   %-20s  %s\n" ---- ----- -------------------- --------
-pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
+#pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
+(for i in `seq 1 24`; do
+	(ssh ${SSH_USERNAME}hammer$i.rcc.psu.edu -o "ConnectTimeout=${TIMEOUT}" bash <<EOF
+NUSERS=\$(users | sed -e 's/[ ]\+/\n/g' | sort -u | grep -v \$USER | wc -l)
+UPTIME=\$(uptime | sed -e 's/.*up[ ]\+//' -e 's/,[ ]\+[0-9]*[ ]\+user.*//' -e 's/[ ]/_/g')
+LOAD=\$(uptime | sed -e 's/.*load average:[ ]\+[0-9.]\+,[ ]\+[0-9.]\+,[ ]\+//')
+HOST=\$(sed -r 's/\..*//'<<<\$HOSTNAME)
+printf "%6s  %5s   %-20s  %s\n" \$LOAD \$NUSERS \$UPTIME \$HOST
+EOF
+) 2>/dev/null &
+done; wait) | sed -e 's/_/ /g' | sort -n
