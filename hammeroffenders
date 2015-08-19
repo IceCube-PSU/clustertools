@@ -3,7 +3,9 @@
 # TODO: Add usage
 # TODO: Make timeout a command line option (not argument)
 
-SSH_USERNAME=$1
+BASE="hammer"
+
+USER=$1
 
 if [ ! -n "$2" ]
 then
@@ -13,17 +15,17 @@ else
 fi
 
 
-echo "Top user per hammer node by %CPU ...."
+echo "Top user per ${BASE} node by %CPU ...."
 
 printf "%15s %15s %5s %5s %12s %12s %15s\n" "User" "Node" "%CPU" "Mem" "SZ" "VSZ" "Time"
 printf "%15s %15s %5s %5s %12s %12s %15s\n" "---------------" "---------------" "-----" "-----" "------------" "------------" "---------------"
 
-hammertop ${SSH_USERNAME} ${TIMEOUT} | grep -e "[ ]*hammer[0-9]\+[ ]\+[3]" | awk '{printf "%15s %15s %5s %5s %12s %12s %15s\n", $11, $1, $3, $4, $5, $6, $7}' | sort
+hammertop ${USER} ${TIMEOUT} | grep -e "[ ]*${BASE}[0-9]\+[ ]\+[3]" | awk '{printf "%15s %15s %5s %5s %12s %12s %15s\n", $11, $1, $3, $4, $5, $6, $7}' | sort
 
 echo ""
-echo "Top user per hammer node by %Memory ...."
+echo "Top user per ${BASE} node by %Memory ...."
 
 printf "%15s %15s %5s %5s %12s %12s %15s\n" "User" "Node" "Mem" "%CPU" "SZ" "VSZ" "Time"
 printf "%15s %15s %5s %5s %12s %12s %15s\n" "---------------" "---------------" "-----" "-----" "------------" "------------" "---------------"
 
-hammertop ${SSH_USERNAME} ${TIMEOUT} | grep -e "[ ]*hammer[0-9]\+[ ]\+[9]" | awk '{printf "%15s %15s %5s %5s %12s %12s %15s\n", $11, $1, $4, $3, $5, $6, $7}' | sort
+hammertop ${USER} ${TIMEOUT} | grep -e "[ ]*${BASE}[0-9]\+[ ]\+[9]" | awk '{printf "%15s %15s %5s %5s %12s %12s %15s\n", $11, $1, $4, $3, $5, $6, $7}' | sort

@@ -2,8 +2,9 @@
 
 # TODO: Add usage
 
-SSH_USERNAME=$1
+USER=$1
 LION_NODE=$2
+DOMAIN="rcc.psu.edu"
 
 if [ ! -n "$2" ]
 then
@@ -12,4 +13,4 @@ else
 	LION_NODE="lion${2}"
 fi
 
-ssh -Y -C ${SSH_USERNAME}@${LION_NODE}.rcc.psu.edu
+setsid ssh -Y -C ${USER}@${LION_NODE}.${DOMAIN}

@@ -2,14 +2,26 @@
 
 # TODO: Add usage
 
-SSH_USERNAME=$1
-HAMMER_NODE=$2
+USER=$1
+NUM=$2
 
-if [ ! -n "$2" ]
-then
-	HAMMER_NODE="hammer"
+BASE="hammer"
+DOMAIN="rcc.psu.edu"
+
+if [ ! -n "${NUM}" ]; then
+	NODE=${BASE}.${DOMAIN}
+elif [ "${NUM,,}" = "all" ]; then
+	for NUM in {1..12}
+	do
+		NODE="${BASE}${NUM}.${DOMAIN}"
+	    setsid ssh -t ${USER}@${NODE} "echo \"\";echo \"\";echo \"SUCCESSFULLY CONNECTED TO HOST '\$HOSTNAME'\";echo \"\";echo \"\""
+	done
+	exit 0
+elif [ "${NUM}" -ge 1 -a "${NUM}" -le 12 ]; then
+		NODE="${BASE}${NUM}.${DOMAIN}"
 else
-	HAMMER_NODE="hammer${2}"
+	echo "INVALID NODE NUMBER SPECIFIED."
+	exit -1
 fi
 
-ssh -Y -C ${SSH_USERNAME}@${HAMMER_NODE}.rcc.psu.edu
+setsid ssh -Y -C ${USER}@${NODE}
