@@ -19,6 +19,9 @@
 # the results more quickly.
 
 DEFAULT_TIMEOUT=10
+BASE="hammer"
+DOMAIN="rcc.psu.edu"
+
 
 if [[ "x$1" != "x" ]]; then
 	SSH_USERNAME=$1"@"
@@ -36,9 +39,9 @@ fi
 #dsh -aMc uptime
 printf "%6s  %5s   %-20s  %s\n" Load Users Uptime Hostname
 printf "%6s  %5s   %-20s  %s\n" ---- ----- -------------------- --------
-#pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@hammer[1-24].rcc.psu.edu loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
-(for i in `seq 1 24`; do
-	(ssh ${SSH_USERNAME}hammer$i.rcc.psu.edu -o "ConnectTimeout=${TIMEOUT}" bash <<EOF
+#pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@${BASE}[1-12].${DOMAIN} loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
+(for i in `seq 1 12`; do
+	(setsid ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}${BASE}${i}.${DOMAIN} -o "ConnectTimeout=${TIMEOUT}" bash <<EOF
 NUSERS=\$(users | sed -e 's/[ ]\+/\n/g' | sort -u | grep -v \$USER | wc -l)
 UPTIME=\$(uptime | sed -e 's/.*up[ ]\+//' -e 's/,[ ]\+[0-9]*[ ]\+user.*//' -e 's/[ ]/_/g')
 LOAD=\$(uptime | sed -e 's/.*load average:[ ]\+[0-9.]\+,[ ]\+[0-9.]\+,[ ]\+//')
