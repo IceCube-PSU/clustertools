@@ -13,8 +13,8 @@ fi
 if [ -n "$pid" ]
 then
 	echo "-- CPU-sort... -----------------------------------------------------------------"
-	echo "$pid" | xargs ps -o "%cpu:5 %mem:5 sz:8 vsz:8 cputime:10 pid:6 ppid:6 sid:6 user comm"  --sort="-%cpu,-cputime,-%mem,-vsz" | head -7
+	echo "$pid" | xargs ps -o "%cpu:5 %mem:5 sz:8 vsz:8 cputime:10 pid:6 ppid:6 sid:6 user comm"  k-%cpu,-cputime,-%mem,-vsz | head -7
 	echo "-- Memory-sort... --------------------------------------------------------------"
-	echo "$pid" | xargs ps -o "%cpu:5 %mem:5 sz:8 vsz:8 cputime:10 pid:6 ppid:6 sid:6 user comm"  --sort="-%mem,-vsz,-%cpu" | head -7
+	echo "$pid" | xargs ps -o "%cpu:5 %mem:5 sz:8 vsz:8 cputime:10 pid:6 ppid:6 sid:6 user comm"  k-%mem,-vsz,-%cpu | head -7
 	echo ""
 fi
