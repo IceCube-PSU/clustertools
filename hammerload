@@ -62,14 +62,14 @@ fi
 
 # Format for header and fields
 if [[ ${DISPLAY_UPTIME} ]]; then
-	fmtstr="%6s %4s %15s %9s\n"
+	fmtstr="%6s %4s %15s %s\n"
 	labels="Load Usrs Uptime Hostname"
-	lines="------ ---- --------------- ---------"
+	lines="------ ---- --------------- --------"
 	argstr="\$LOAD \$NUSERS \$UPTIME \$HOST"
 else
-	fmtstr="%6s %4s %9s\n";
+	fmtstr="%6s %4s %s\n";
 	labels="Load Usrs Hostname"
-	lines="------ ---- ---------"
+	lines="------ ---- --------"
 	argstr="\$LOAD \$NUSERS \$HOST"
 fi
 
