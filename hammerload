@@ -6,7 +6,7 @@
 # USAGE:
 # * Modify your username below
 # Then, from your local machine, just execute this script with your username as the argument to the script:
-#   hammerload jll1062
+#   hammerload -u jll1062
 #
 # You can also add an alias to your .bashrc file that reduces the typing involved:
 #   alias hammerload='hammerload jll1062'
@@ -18,35 +18,77 @@
 # slow connections, but you can modify this for faster connections to return
 # the results more quickly.
 
-DEFAULT_TIMEOUT=10
+N_NODES=12
+
+# Script argument defaults
 BASE="hammer"
 DOMAIN="rcc.psu.edu"
+PRINT_HEADER="true"
+SORT="load"
+N=100000
+DISPLAY_UPTIME=""
+TIMEOUT=10
+SSH_USERNAME=""
 
+# Get any arguments from command line
+while getopts 'b:d:Dn:pt:u:' flag; do
+	case "${flag}" in
+		b) BASE=${OPTARG} ;;
+		d) DOMAIN=${OPTARG} ;;
+		D) PRINT_HEADER='' ;;
+		#H) SORT="hostname" ;;
+		#h) help ;;
+		n) N=${OPTARG} ;;
+		p) DISPLAY_UPTIME="true" ;;
+		t) TIMEOUT=${OPTARG} ;;
+		u) SSH_USERNAME=${OPTARG} ;;
+		#U) SORT="users" ;;
+	esac
+done
 
-if [[ "x$1" != "x" ]]; then
-	SSH_USERNAME=$1"@"
-else
-	SSH_USERNAME=""
+# Debug info
+DEBUG=''
+if [[ $DEBUG ]]; then
+	echo "Debug info..."
+	echo "BASE: $BASE"
+	echo "SSH_USERNAME: $SSH_USERNAME"
+	echo "DOMAIN: $DOMAIN"
+	echo "TIMEOUT: $TIMEOUT"
+	echo "SORT: $SORT"
+	echo "N: $N"
+	echo "DISPLAY_UPTIME: $DISPLAY_UPTIME"
+	echo ""
 fi
 
-if [ ! -n "$2" ]
-then
-	TIMEOUT=$DEFAULT_TIMEOUT
+# Format for header and fields
+if [[ ${DISPLAY_UPTIME} ]]; then
+	fmtstr="%6s %4s %15s %9s\n"
+	labels="Load Usrs Uptime Hostname"
+	lines="------ ---- --------------- ---------"
+	argstr="\$LOAD \$NUSERS \$UPTIME \$HOST"
 else
-	TIMEOUT=$2
+	fmtstr="%6s %4s %9s\n";
+	labels="Load Usrs Hostname"
+	lines="------ ---- ---------"
+	argstr="\$LOAD \$NUSERS \$HOST"
 fi
 
-#dsh -aMc uptime
-printf "%6s  %5s   %-20s  %s\n" Load Users Uptime Hostname
-printf "%6s  %5s   %-20s  %s\n" ---- ----- -------------------- --------
-#pdsh -t $TIMEOUT -u $TIMEOUT -w ssh:${SSH_USERNAME}@${BASE}[1-12].${DOMAIN} loadusersuptime 2>/dev/null | grep ">>>" | sed -e 's/>>>//' -e 's/:\s*/;/' | awk -F";" '{printf "%6s  %5s   %-20s  %s\n", $2, $3, $4, $1}' 2>/dev/null | sed -e 's/_/ /g' | sort -n
-(for i in `seq 1 12`; do
-	(setsid ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}${BASE}${i}.${DOMAIN} -o "ConnectTimeout=${TIMEOUT}" bash <<EOF
+# Header
+if [[ ${PRINT_HEADER} ]]; then
+	printf "$fmtstr" $labels
+	printf "$fmtstr" $lines
+fi
+
+# Run commands in parallel on all servers; sort and tabulate results
+(for i in `seq 1 $N_NODES`; do
+	(setsid ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${BASE}${i}.${DOMAIN} -o "ConnectTimeout=${TIMEOUT}" bash <<EOF
 NUSERS=\$(users | sed -e 's/[ ]\+/\n/g' | sort -u | grep -v \$USER | wc -l)
-UPTIME=\$(uptime | sed -e 's/.*up[ ]\+//' -e 's/,[ ]\+[0-9]*[ ]\+user.*//' -e 's/[ ]/_/g')
+if [[ "${DISPLAY_UPTIME}" ]]; then
+	UPTIME=\$(uptime | sed -e 's/.*up[ ]\+//' -e 's/,[ ]\+[0-9]*[ ]\+user.*//' -e 's/[ ]/_/g')
+fi
 LOAD=\$(uptime | sed -e 's/.*load average:[ ]\+[0-9.]\+,[ ]\+[0-9.]\+,[ ]\+//')
 HOST=\$(sed -r 's/\..*//'<<<\$HOSTNAME)
-printf "%6s  %5s   %-20s  %s\n" \$LOAD \$NUSERS \$UPTIME \$HOST
+printf "$fmtstr" $argstr
 EOF
 ) 2>/dev/null &
-done; wait) | sed -e 's/_/ /g' | sort -n
+done; wait) | sed -e 's/_/ /g' | sort -n | head -${N}
