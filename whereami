@@ -9,7 +9,7 @@
 # Date:   2016-02-18
 
 HEADER=`ps -o pid,ppid,%cpu,cputime,%mem,rss,vsz,etime,cmd | head -1`
-REMOTE_COMMAND='ps -e -ww -o user:7,pid,ppid,%cpu,cputime,%mem,rss,vsz,etime,cmd | grep -e "^${USER}" | grep -v "ps -e" | grep -v sshd | grep -v "/bin/bash" | grep -v "sed " | grep -v "bash" | grep -v grep | sed -r "s/^.{8}//g" | sed -e "s/^[[:space:]]*//" -e "s/[[:space:]]*$//"'
+REMOTE_COMMAND='ps -ww -o "user:7,pid,ppid,%cpu,cputime,%mem,rss,vsz,etime,cmd" -u $USER | grep -e "^${USER}" | grep -v "ps -ww" | grep -v sshd | grep -v "/bin/bash" | grep -v "sed " | grep -v "bash" | grep -v "ssh-agent -s" | grep -v grep | sed -r "s/^.{8}//g" | sed -e "s/^[[:space:]]*//" -e "s/[[:space:]]*$//"'
 SERVERS=`cat ~/.ssh/config | grep -E '^Host' | sed 's/^Host //'`
 
 declare -a OUTPUT
