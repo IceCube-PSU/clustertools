@@ -7,11 +7,14 @@ SEP="    "
 # Put your username first in the list
 USERS="$USER `echo $ALL_USERS | sed s/$USER//`"
 
+tmp_r=`mktemp`
+tmp_i=`mktemp`
+
 # Running jobs
-showq -r > /tmp/showq_r 2>/dev/null
+showq -r > $tmp_r 2>/dev/null
 
 # Idle (but eligible-to-run) jobs
-showq -i > /tmp/showq_i 2>/dev/null
+showq -i > $tmp_i 2>/dev/null
 
 # Queue header (first line of header)
 printf "%8s %23s" "" "      Batch queue      "
@@ -48,15 +51,15 @@ jobs_in_pool_total=0
 # Display info for each user
 for user in $USERS
 do
-	b_running=`grep $user /tmp/showq_r | grep -c " PI "`
-	b_queued=`grep $user /tmp/showq_i | grep -c " batch "`
+	b_running=`grep $user $tmp_r | grep -c " PI "`
+	b_queued=`grep $user $tmp_i | grep -c " batch "`
 	b_subtotal=$(( b_running + b_queued ))
 	b_total_running=$(( b_total_running + b_running ))
 	b_total_queued=$(( b_total_queued + b_queued ))
 	b_total=$(( b_total + b_subtotal ))
 
-	o_running=`grep $user /tmp/showq_r | grep " op " | grep -c R`
-	o_queued=`grep $user /tmp/showq_i | grep -c " open "`
+	o_running=`grep $user $tmp_r | grep " op " | grep -c R`
+	o_queued=`grep $user $tmp_i | grep -c " open "`
 	o_subtotal=$(( o_running + o_queued ))
 	o_total_running=$(( o_total_running + o_running ))
 	o_total_queued=$(( o_total_queued + o_queued ))
@@ -70,6 +73,8 @@ do
 	printf "%7d %7d %7d   %17d" $o_running $o_queued $o_subtotal $jobs_in_pool
 	printf "\n"
 done
+
+rm -f $tmp_r $tmp_i
 
 # Display info totaled for all users
 printf "\n"
