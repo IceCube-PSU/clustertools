@@ -1,0 +1,79 @@
+#!/bin/bash
+
+ALL_USERS="dfc13 dup193 fxh140 jll1062 pde3"
+
+SEP="    "
+
+# Put your username first in the list
+USERS="$USER `echo $ALL_USERS | sed s/$USER//`"
+
+# Running jobs
+showq -r > /tmp/showq_r 2>/dev/null
+
+# Idle (but eligible-to-run) jobs
+showq -i > /tmp/showq_i 2>/dev/null
+
+# Queue header (first line of header)
+printf "%8s %23s" "" "      Batch queue      "
+printf "$SEP"
+printf "%23s" "      Open queue       "
+printf "\n"
+
+# Sub-header (seconds line of header)
+printf "%-8s %7s %7s %7s" " User" "running" "queued" "total"
+printf "$SEP"
+printf "%7s %7s %7s   %17s" "running" "queued" "total" "Files in pool dir"
+printf "\n"
+
+# Underlines
+printf "%-8s %7s %7s %7s" "--------" "-------" "-------" "-------"
+printf "$SEP"
+printf "%7s %7s %7s   %17s" "-------" "-------" "-------" "-----------------"
+printf "\n"
+
+# Counters for totals...
+
+# b_ prefix is for "batch" queue
+b_total_running=0
+b_total_queued=0
+b_total=0
+
+# o_ prefix is for "open" queue
+o_total_running=0
+o_total_queued=0
+o_total=0
+
+jobs_in_pool_total=0
+
+# Display info for each user
+for user in $USERS
+do
+	b_running=`grep $user /tmp/showq_r | grep -c " PI "`
+	b_queued=`grep $user /tmp/showq_i | grep -c " batch "`
+	b_subtotal=$(( b_running + b_queued ))
+	b_total_running=$(( b_total_running + b_running ))
+	b_total_queued=$(( b_total_queued + b_queued ))
+	b_total=$(( b_total + b_subtotal ))
+
+	o_running=`grep $user /tmp/showq_r | grep " op " | grep -c R`
+	o_queued=`grep $user /tmp/showq_i | grep -c " open "`
+	o_subtotal=$(( o_running + o_queued ))
+	o_total_running=$(( o_total_running + o_running ))
+	o_total_queued=$(( o_total_queued + o_queued ))
+	o_total=$(( o_total + o_subtotal ))
+
+	jobs_in_pool=`eval "ls ~${user}/PBS/job_pool | wc -l"`
+	jobs_in_pool_total=$(( jobs_in_pool_total + jobs_in_pool ))
+
+	printf "%-8s %7d %7d %7d" "$user" $b_running $b_queued $b_subtotal
+	printf "$SEP"
+	printf "%7d %7d %7d   %17d" $o_running $o_queued $o_subtotal $jobs_in_pool
+	printf "\n"
+done
+
+# Display info totaled for all users
+printf "\n"
+printf "%-8s %7d %7d %7d" "Total" $b_total_running $b_total_queued $b_total
+printf "$SEP"
+printf "%7d %7d %7d   %17d" $o_total_running $o_total_queued $o_total $jobs_in_pool_total
+printf "\n\n"
