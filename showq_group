@@ -97,13 +97,14 @@ printf "%7d %7d %7d   %17d" $o_total_running $o_total_queued $o_total $jobs_in_p
 printf "\n\n"
 
 # Display info totaled for all users in all queues
-printf "Our totals  : %3d running jobs, %4d cores; %d jobs enqueued.\n" \
+printf "Our totals  : %4d running jobs, %4d cores; %d jobs enqueued.\n" \
 	$(( b_total_running + o_total_running )) \
 	$total_cores \
 	$(( b_total_queued + o_total_queued ))
 
 # Display cluster utilization
-printf "Cluster info: %s\n" "`cat $tmp_r | grep 'processors in use' | sed -e 's/  \+/, /' -e 's/active/running/' -e 's/processors/cores/' -e 's/ by local jobs//'`"
+cluster_numbers=`showq -r | grep 'processors in use' | sed -e 's/[a-zA-Z,;)(]*//g' -e 's/  \+/ /g'`
+printf "Cluster info: %4d running jobs, %4d of %4d cores active (%s)" $cluster_numbers
 
 # Cleanup
 rm -f $tmp_r $tmp_b $tmp_q
