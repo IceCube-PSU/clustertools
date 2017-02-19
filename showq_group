@@ -8,13 +8,17 @@ SEP="    "
 USERS="$USER `echo $ALL_USERS | sed s/$USER//`"
 
 tmp_r=`mktemp`
-tmp_i=`mktemp`
+tmp_b=`mktemp`
+tmp_q=`mktemp`
 
 # Running jobs
 showq -r > $tmp_r 2>/dev/null
 
-# Idle (but eligible-to-run) jobs
-showq -i > $tmp_i 2>/dev/null
+# Idle (but eligible-to-run) jobs (?)
+showq -b > $tmp_b 2>/dev/null
+
+# Idle (but eligible-to-run) jobs (?)
+qstat -a > $tmp_q 2>/dev/null
 
 # Queue header (first line of header)
 printf "%8s %23s" "" "      Batch queue      "
@@ -51,15 +55,21 @@ jobs_in_pool_total=0
 # Display info for each user
 for user in $USERS
 do
+	if [ "$user" == "$USER" ]
+	then
+		b_queued=`grep $user $tmp_q | grep " Q " | grep -c " batch "`
+		o_queued=`grep $user $tmp_q | grep " Q " | grep -c " open "`
+	else
+		b_queued=`grep -c $user $tmp_b`
+		o_queued=`grep -c $user $tmp_b`
+	fi
 	b_running=`grep $user $tmp_r | grep -c " PI "`
-	b_queued=`grep $user $tmp_i | grep -c " batch "`
 	b_subtotal=$(( b_running + b_queued ))
 	b_total_running=$(( b_total_running + b_running ))
 	b_total_queued=$(( b_total_queued + b_queued ))
 	b_total=$(( b_total + b_subtotal ))
 
 	o_running=`grep $user $tmp_r | grep " op " | grep -c R`
-	o_queued=`grep $user $tmp_i | grep -c " open "`
 	o_subtotal=$(( o_running + o_queued ))
 	o_total_running=$(( o_total_running + o_running ))
 	o_total_queued=$(( o_total_queued + o_queued ))
@@ -74,7 +84,7 @@ do
 	printf "\n"
 done
 
-rm -f $tmp_r $tmp_i
+rm -f $tmp_r $tmp_b $tmp_q
 
 # Display info totaled for all users
 printf "\n"
@@ -82,3 +92,7 @@ printf "%-8s %7d %7d %7d" "Total" $b_total_running $b_total_queued $b_total
 printf "$SEP"
 printf "%7d %7d %7d   %17d" $o_total_running $o_total_queued $o_total $jobs_in_pool_total
 printf "\n\n"
+printf "In all: %d jobs running, %d jobs enqueued, and %d PBS scripts in job_pool dirs.\n" \
+	$(( b_total_running + o_total_running )) \
+	$(( b_total_queued + o_total_queued )) \
+	$jobs_in_pool_total
