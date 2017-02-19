@@ -52,6 +52,8 @@ o_total=0
 
 jobs_in_pool_total=0
 
+total_cores=0
+
 # Display info for each user
 for user in $USERS
 do
@@ -78,13 +80,14 @@ do
 	jobs_in_pool=`eval "ls ~${user}/PBS/job_pool | wc -l"`
 	jobs_in_pool_total=$(( jobs_in_pool_total + jobs_in_pool ))
 
+	cores=`grep $user $tmp_r | awk 'BEGIN{n=0}{n += $10}END{print n}'`
+	total_cores=$(( total_cores + cores ))
+
 	printf "%-8s %7d %7d %7d" "$user" $b_running $b_queued $b_subtotal
 	printf "$SEP"
 	printf "%7d %7d %7d   %17d" $o_running $o_queued $o_subtotal $jobs_in_pool
 	printf "\n"
 done
-
-rm -f $tmp_r $tmp_b $tmp_q
 
 # Display info totaled for all users
 printf "\n"
@@ -92,7 +95,15 @@ printf "%-8s %7d %7d %7d" "Total" $b_total_running $b_total_queued $b_total
 printf "$SEP"
 printf "%7d %7d %7d   %17d" $o_total_running $o_total_queued $o_total $jobs_in_pool_total
 printf "\n\n"
-printf "In all: %d jobs running, %d jobs enqueued, and %d PBS scripts in job_pool dirs.\n" \
+
+# Display info totaled for all users in all queues
+printf "Our totals  : %3d running jobs, %4d cores; %d jobs enqueued.\n" \
 	$(( b_total_running + o_total_running )) \
-	$(( b_total_queued + o_total_queued )) \
-	$jobs_in_pool_total
+	$total_cores \
+	$(( b_total_queued + o_total_queued ))
+
+# Display cluster utilization
+printf "Cluster info: %s\n" "`cat $tmp_r | grep 'processors in use' | sed -e 's/  \+/, /' -e 's/active/running/' -e 's/processors/cores/' -e 's/ by local jobs//'`"
+
+# Cleanup
+rm -f $tmp_r $tmp_b $tmp_q
