@@ -1,0 +1,117 @@
+#!/bin/sh
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=03:00:00
+#PBS -l mem=4gb
+#PBS -j oe
+#PBS -S /bin/sh
+
+cd $PBS_O_WORKDIR
+
+#==============================================================================
+# NOTE:
+#  * Modify the above however is approrpiate for your work, logging needs, etc.
+#  * CHANGE your group to dfc13_collab and perms to 640, 644, 750, or 755 for
+#    this PBS script to be usable via openQ.
+#  * Make sure any and all code referenced in scripts you call below is set
+#    in the PAtH and/or PYTHONPATH in the "bashrc"-like section below.
+#  * Make sure any scripts called or python functions imported have
+#    dfc13_collab group and 640, 644, 750, or 755 permissions set, as well
+#    as their parent director(ies).
+#==============================================================================
+
+
+#==============================================================================
+# Setup environment similar to what's done in .bashrc
+#
+# (Also clears out PATH and PYTHONPATH so that user's settings don't interfere
+# with this script)
+#==============================================================================
+
+JHOME=~jll1062
+MYI3_SRC="$JHOME/src"
+MYI3_BUILD="$JHOME/build"
+export PARROT_RUN="$JHOME/cctools/bin/parrot_run"
+export PARROT_CVMFS_ALIEN_CACHE="/storage/group/dfc13_collab/cache"
+export CVMFS="/cvmfs/icecube.opensciencegrid.org"
+MYPY="$JHOME/mypy"
+ICECUBETOOLS="$JHOME/cowen/icecubetools"
+CLUSTERTOOLS="$JHOME/cowen/clustertools"
+COWEN_SCRIPTS="$JHOME/cowen/scripts"
+ENV_SHELL="$MYI3_BUILD/pingusoft/trunk/env-shell.sh"
+
+
+#==============================================================================
+# Things specific to my script
+#==============================================================================
+
+HOURS=3
+TIMESTAMP=`date +'%Y-%m-%dT%H%M%z'`
+[ -z "$PBS_O_QUEUE" ] && PBS_O_QUEUE='interactive'
+[ -z "$PBS_JOBID" ] && PBS_JOBID="$BASHPID"
+LOGNAME="${HOURS}hr_${PBS_O_QUEUE}_${USER}_${TIMESTAMP}_${PBS_JOBID}"
+
+export PATH=.:/bin:/usr/bin:/usr/local/bin
+export PYTHONPATH=$MYPY/bin:$MYPY/lib:$COWEN_SCRIPTS:$ICECUBETOOLS:$CLUSTERTOOLS
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+umask 000
+
+SCRIPT_DIR="$JHOME/cowen/repeated_reco"
+SCRIPT="$ICECUBETOOLS/repeated_reco.py"
+GCD="$SCRIPT_DIR/GeoCalibDetectorStatus_2013.56429_V1_Modified.i3.gz"
+IN_DIR="/storage/group/dfc13_collab/repeated_reco"
+
+
+#==============================================================================
+# Define functions whereby CVMFS is accessible
+# via the Parrot user-space tool (and is intended--but not tested--to also work
+# with a proper native installation of CVMFS)
+#==============================================================================
+
+function init_i3_env () {
+	py2_vx=$1
+	shift
+	env_shell=$1
+	shift
+	if [ -x "$CVMFS/${py2_vx}/setup.sh" ]
+	then
+		eval $( $CVMFS/${py2_vx}/setup.sh )
+	else
+		echo "ERROR: $CVMFS/${py2_vx}/setup.sh not found or not executable!"
+	fi
+
+	if [ -x "${env_shell}" ]
+	then
+		${env_shell} "$*"
+	else
+		echo "ERROR: ${env_shell} not found or not executable!"
+	fi
+} 
+export -f init_i3_env
+
+function i3_run () {
+	if [ ! -d "$CVMFS" ]
+	then
+		if [ -x "`which cvmfs_config 2>/dev/null`" ]
+		then
+			cvmfs_config probe
+			/bin/sh --norc -c "'init_i3_env' $*"
+		elif [ ! -d "$CVMFS" -a -x "$PARROT_RUN" ]
+		then
+			HTTP_PROXY="cache01.hep.wisc.edu:3128" "$PARROT_RUN" /bin/sh --norc -c "'init_i3_env' $*"
+		fi
+	fi
+}
+export -f i3_run
+
+
+#==============================================================================
+# Run the script using the functions defined above.
+#==============================================================================
+
+i3_run py2-v1 "$ENV_SHELL" 'python' \
+	"$SCRIPT" \
+		--gcd "$GCD" \
+		--indir "$IN_DIR" \
+		--hours-remaining $HOURS \
+		--detector deepcore > ${JHOME}/PBS/log/${LOGNAME} 2>&1
