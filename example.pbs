@@ -17,6 +17,8 @@ cd $PBS_O_WORKDIR
 #  * Make sure any scripts called or python functions imported have
 #    dfc13_collab group and 640, 644, 750, or 755 permissions set, as well
 #    as their parent director(ies).
+#  * The script has its output redirected below (the > and 2>&1 in the last
+#    line). If you want to use PBS logging, you shouldn't do that.
 #==============================================================================
 
 
