@@ -9,7 +9,7 @@
 # Date:   2016-02-18
 
 HEADER=`ps -o pid,ppid,%cpu,cputime,%mem,rss,vsz,etime,cmd | head -1`
-REMOTE_COMMAND='ps -ww -o "user:7,pid,ppid,%cpu,cputime,%mem,rss,vsz,etime,cmd" -u $USER | grep -e "^${USER}" | grep -v "ps -ww" | grep -v sshd | grep -v "/bin/bash" | grep -v "sed " | grep -v "bash" | grep -v "ssh-agent -s" | grep -v grep | sed -r "s/^.{8}//g" | sed -e "s/^[[:space:]]*//" -e "s/[[:space:]]*$//"'
+REMOTE_COMMAND='ps -ww -o "user:7,pid,ppid,%cpu,cputime,%mem,rss,vsz,etime,cmd" -u $USER | grep -v "ps -ww" | grep -v sshd | grep -v "/bin/bash" | grep -v "sed " | grep -v "bash" | grep -v "ssh-agent -s" | grep -v grep | sed -r "s/^.{8}//g" | sed -e "s/^[[:space:]]*//" -e "s/[[:space:]]*$//"'
 SERVERS=`cat ~/.ssh/config | grep -E '^Host' | sed 's/^Host //'`
 
 declare -a OUTPUT
@@ -24,7 +24,7 @@ do
 	HOST_ALIASES[$COUNT]="$HOST_ALIAS"
 	HA_LEN=`echo "$HOST_ALIAS" | wc -m`
 	(($HA_LEN > $HA_MAXLEN)) && HA_MAXLEN=$HA_LEN
-	OUTPUT[$COUNT]=`ssh -q -o "BatchMode yes" -o "ConnectTimeout 5" "$HOST_ALIAS" "$REMOTE_COMMAND"`
+	OUTPUT[$COUNT]=`ssh -q -o "BatchMode yes" -o "ConnectTimeout 5" "$HOST_ALIAS" "$REMOTE_COMMAND" 2>/dev/null`
 	COUNT=$(( COUNT+1 ))
 done
 printf "...\n"
