@@ -7,48 +7,52 @@ SEP="    "
 # Put your username first in the list
 USERS="$USER `echo $ALL_USERS | sed s/$USER//`"
 
-tmp_r=`mktemp`
-tmp_b=`mktemp`
-tmp_q=`mktemp`
+SHOWQ_R=`mktemp`
+SHOWQ_B=`mktemp`
+QSTAT_A=`mktemp`
 
 # Running jobs
-showq -r > $tmp_r 2>/dev/null
+showq -r > $SHOWQ_R 2>/dev/null
 
 # Idle (but eligible-to-run) jobs (?)
-showq -b > $tmp_b 2>/dev/null
+showq -b > $SHOWQ_B 2>/dev/null
 
 # Idle (but eligible-to-run) jobs (?)
-qstat -a > $tmp_q 2>/dev/null
+qstat -a > $QSTAT_A 2>/dev/null
 
 # Queue header (first line of header)
 printf "%8s %23s" "" "      Batch queue      "
 printf "$SEP"
-printf "%23s" "      Open queue       "
+printf "%23s"        "      Open queue       "
+printf "$SEP"
+printf "%8s" "Files in"
 printf "\n"
 
 # Sub-header (seconds line of header)
-printf "%-8s %7s %7s %7s" " User" "running" "queued" "total"
+printf "%-8s %7s %7s %7s" "  User" "running" "queued" "total"
 printf "$SEP"
-printf "%7s %7s %7s   %17s" "running" "queued" "total" "Files in pool dir"
+printf "%7s %7s %7s"               "running" "queued" "total"
+printf "$SEP"
+printf "%8s" "pool dir"
 printf "\n"
 
 # Underlines
 printf "%-8s %7s %7s %7s" "--------" "-------" "-------" "-------"
 printf "$SEP"
-printf "%7s %7s %7s   %17s" "-------" "-------" "-------" "-----------------"
+printf "%7s %7s %7s" "-------" "-------" "-------"
+printf "$SEP"
+printf "%8s" "--------"
 printf "\n"
 
 # Counters for totals...
 
-# b_ prefix is for "batch" queue
-b_total_running=0
-b_total_queued=0
-b_total=0
+batchq_total_running=0
+batchq_total_queued=0
+batchq_total=0
 
-# o_ prefix is for "open" queue
-o_total_running=0
-o_total_queued=0
-o_total=0
+openq_total_running=0
+openq_total_queued=0
+openq_total=0
 
 jobs_in_pool_total=0
 
@@ -59,52 +63,60 @@ for user in $USERS
 do
 	if [ "$user" == "$USER" ]
 	then
-		b_queued=`grep $user $tmp_q | grep " Q " | grep -c " batch "`
-		o_queued=`grep $user $tmp_q | grep " Q " | grep -c " open "`
+		# This shows shows which queue (open/batch) the jobs are in but only
+		# does so for the user
+		batchq_queued=`grep $user $QSTAT_A | grep " Q " | grep -c " batch "`
+		openq_queued=`grep $user $QSTAT_A | grep " Q " | grep -c " open "`
 	else
-		b_queued=`grep -c $user $tmp_b`
-		o_queued=`grep -c $user $tmp_b`
+		# This shows all users, but doesn't show which queue (open/batch) the
+		# jobs are in.
+		batchq_queued=`grep -c $user $SHOWQ_B`
+		openq_queued=`grep -c $user $SHOWQ_B`
 	fi
-	b_running=`grep $user $tmp_r | grep -c " PI "`
-	b_subtotal=$(( b_running + b_queued ))
-	b_total_running=$(( b_total_running + b_running ))
-	b_total_queued=$(( b_total_queued + b_queued ))
-	b_total=$(( b_total + b_subtotal ))
+	batchq_running=`grep $user $SHOWQ_R | grep -c " PI "`
+	batchq_subtotal=$(( batchq_running + batchq_queued ))
+	batchq_total_running=$(( batchq_total_running + batchq_running ))
+	batchq_total_queued=$(( batchq_total_queued + batchq_queued ))
+	batchq_total=$(( batchq_total + batchq_subtotal ))
 
-	o_running=`grep $user $tmp_r | grep " op " | grep -c R`
-	o_subtotal=$(( o_running + o_queued ))
-	o_total_running=$(( o_total_running + o_running ))
-	o_total_queued=$(( o_total_queued + o_queued ))
-	o_total=$(( o_total + o_subtotal ))
+	openq_running=`grep $user $SHOWQ_R | grep " op " | grep -c R`
+	openq_subtotal=$(( openq_running + openq_queued ))
+	openq_total_running=$(( openq_total_running + openq_running ))
+	openq_total_queued=$(( openq_total_queued + openq_queued ))
+	openq_total=$(( openq_total + openq_subtotal ))
 
 	jobs_in_pool=`eval "ls ~${user}/PBS/job_pool | wc -l"`
 	jobs_in_pool_total=$(( jobs_in_pool_total + jobs_in_pool ))
 
-	cores=`grep $user $tmp_r | awk 'BEGIN{n=0}{n += $10}END{print n}'`
+	cores=`grep $user $SHOWQ_R | awk 'BEGIN{n=0}{n += $10}END{print n}'`
 	total_cores=$(( total_cores + cores ))
 
-	printf "%-8s %7d %7d %7d" "$user" $b_running $b_queued $b_subtotal
+	printf "%-8s %7d %7d %7d" "$user" $batchq_running $batchq_queued $batchq_subtotal
 	printf "$SEP"
-	printf "%7d %7d %7d   %17d" $o_running $o_queued $o_subtotal $jobs_in_pool
+	printf "%7d %7d %7d" $openq_running $openq_queued $openq_subtotal
+	printf "$SEP"
+	printf "%8d" $jobs_in_pool
 	printf "\n"
 done
 
 # Display info totaled for all users
 printf "\n"
-printf "%-8s %7d %7d %7d" "Total" $b_total_running $b_total_queued $b_total
+printf "%-8s %7d %7d %7d" "Total" $batchq_total_running $batchq_total_queued $batchq_total
 printf "$SEP"
-printf "%7d %7d %7d   %17d" $o_total_running $o_total_queued $o_total $jobs_in_pool_total
+printf "%7d %7d %7d" $openq_total_running $openq_total_queued $openq_total
+printf "$SEP"
+printf "%8d" $jobs_in_pool_total
 printf "\n\n"
 
 # Display info totaled for all users in all queues
 printf "Our totals  : %4d running jobs, %4d cores; %d jobs enqueued.\n" \
-	$(( b_total_running + o_total_running )) \
+	$(( batchq_total_running + openq_total_running )) \
 	$total_cores \
-	$(( b_total_queued + o_total_queued ))
+	$(( batchq_total_queued + openq_total_queued ))
 
 # Display cluster utilization
-cluster_numbers=`showq -r | grep 'processors in use' | sed -e 's/[a-zA-Z,;)(]*//g' -e 's/  \+/ /g'`
-printf "Cluster info: %4d running jobs, %4d of %4d cores active (%s)" $cluster_numbers
+cluster=`grep 'in use' $SHOWQ_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
+printf "Cluster info: %4d running jobs, %4d of %4d cores active (%s)" $cluster
 
 # Cleanup
-rm -f $tmp_r $tmp_b $tmp_q
+rm -f $SHOWQ_R $SHOWQ_B $QSTAT_A
