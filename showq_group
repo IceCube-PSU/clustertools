@@ -65,21 +65,21 @@ do
 	then
 		# This shows shows which queue (open/batch) the jobs are in but only
 		# does so for the user
-		batchq_queued=`grep $user $QSTAT_A | grep " Q " | grep -c " batch "`
-		openq_queued=`grep $user $QSTAT_A | grep " Q " | grep -c " open "`
+		batchq_queued=`grep " $user"  $QSTAT_A | grep " Q " | grep -c " batch "`
+		openq_queued=`grep " $user " $QSTAT_A | grep " Q " | grep -c " open "`
 	else
 		# This shows all users, but doesn't show which queue (open/batch) the
 		# jobs are in.
-		batchq_queued=`grep -c $user $SHOWQ_B`
-		openq_queued=`grep -c $user $SHOWQ_B`
+		batchq_queued=`grep -c " $user " $SHOWQ_B`
+		openq_queued=`grep -c " $user " $SHOWQ_B`
 	fi
-	batchq_running=`grep $user $SHOWQ_R | grep -c " PI "`
+	batchq_running=`grep " $user " $SHOWQ_R | grep -c " PI "`
 	batchq_subtotal=$(( batchq_running + batchq_queued ))
 	batchq_total_running=$(( batchq_total_running + batchq_running ))
 	batchq_total_queued=$(( batchq_total_queued + batchq_queued ))
 	batchq_total=$(( batchq_total + batchq_subtotal ))
 
-	openq_running=`grep $user $SHOWQ_R | grep " op " | grep -c R`
+	openq_running=`grep " $user " $SHOWQ_R | grep " op " | grep -c R`
 	openq_subtotal=$(( openq_running + openq_queued ))
 	openq_total_running=$(( openq_total_running + openq_running ))
 	openq_total_queued=$(( openq_total_queued + openq_queued ))
@@ -88,7 +88,7 @@ do
 	jobs_in_pool=`eval "ls ~${user}/PBS/job_pool | wc -l"`
 	jobs_in_pool_total=$(( jobs_in_pool_total + jobs_in_pool ))
 
-	cores=`grep $user $SHOWQ_R | awk 'BEGIN{n=0}{n += $10}END{print n}'`
+	cores=`grep " $user " $SHOWQ_R | awk 'BEGIN{n=0}{n += $10}END{print n}'`
 	total_cores=$(( total_cores + cores ))
 
 	printf "%-8s %7d %7d %7d" "$user" $batchq_running $batchq_queued $batchq_subtotal
