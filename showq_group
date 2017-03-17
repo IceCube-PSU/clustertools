@@ -116,7 +116,7 @@ printf "Our totals  : %4d running jobs, %4d cores; %d jobs enqueued.\n" \
 
 # Display cluster utilization
 cluster=`grep 'in use' $SHOWQ_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
-printf "Cluster info: %4d running jobs, %4d of %4d cores active (%s)" $cluster
+printf "Cluster info: %4d running jobs, %4d of %4d cores active (%s)\n" $cluster
 
 # Cleanup
 rm -f $SHOWQ_R $SHOWQ_B $QSTAT_A
