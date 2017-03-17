@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ALL_USERS="auk37 dfc13 dup193 fxh140 jll1062 pde3"
+ALL_USERS=`grep "list = " /storage/home/pde3/openQ/config.ini | sed -e 's/list = //' -e 's/,/\n/g' | sort | xargs echo`
 
 SEP="    "
 
@@ -85,7 +85,7 @@ do
 	openq_total_queued=$(( openq_total_queued + openq_queued ))
 	openq_total=$(( openq_total + openq_subtotal ))
 
-	jobs_in_pool=`eval "ls ~${user}/PBS/job_pool | wc -l"`
+	jobs_in_pool=`eval "ls ~${user}/PBS/job_pool 2>/dev/null | wc -l"`
 	jobs_in_pool_total=$(( jobs_in_pool_total + jobs_in_pool ))
 
 	cores=`grep " $user " $SHOWQ_R | awk 'BEGIN{n=0}{n += $10}END{print n}'`
