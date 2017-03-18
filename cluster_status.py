@@ -159,18 +159,21 @@ if __name__ == '__main__':
 
         effective_cores_available = np.floor(info['np'] - info['load'])
         if effective_cores_available < MIN_CORES_TO_RUN_JOB:
-            full_by_cpu_usage.append(1)
+            f_by_c = True
         else:
-            full_by_cpu_usage.append(0)
+            f_by_c = False
+        full_by_cpu_usage.append(f_by_c)
 
         if info['mem_free'] < MIN_MEM_TO_RUN_JOB_GB:
-            full_by_mem_usage.append(1)
+            f_by_m = True
         else:
-            full_by_mem_usage.append(0)
+            f_by_m = False
+        full_by_mem_usage.append(f_by_m)
 
         if 'comp-st' in host:
-            mem_slots_avail = info['mem_free'] // MEM_PER_JOB_GB
-            cpu_slots_avail = effective_cores_available // CORES_PER_JOB
+            full = f_by_m or f_by_c
+            mem_slots_avail = int(not full) * info['mem_free'] // MEM_PER_JOB_GB
+            cpu_slots_avail = int(not full) * effective_cores_available // CORES_PER_JOB
             slots_available.append(min(mem_slots_avail, cpu_slots_avail))
 
         # TODO: make -v command-line option and output the following
@@ -206,8 +209,10 @@ if __name__ == '__main__':
         % (total_nodes_found, total_full_by_either, total_full_by_cpu,
            total_full_by_mem, total_full_by_both)
     )
-    print ('Full criteria: at least %d cores and %d GB available.'
-           % (MIN_CORES_TO_RUN_JOB, MIN_MEM_TO_RUN_JOB_GB))
+    print (
+        '  Note: "full" criteria: fewer than %d cores -or- %d GB available.'
+        % (MIN_CORES_TO_RUN_JOB, MIN_MEM_TO_RUN_JOB_GB)
+    )
 
     print ''
     print (
