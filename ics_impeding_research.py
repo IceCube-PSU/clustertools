@@ -1,33 +1,34 @@
 #!/usr/bin/env python
+"""
+Obtain detailed usage information for the ICS-ACI cluster
+"""
 
 
 # TODO: Kill errant thread(s)
-# TODO: Get memory info for each node to determine if it is memory-limited
-# TODO: Cache results to shared folder with a timestamp so we don't have to
-#       query all hosts to get this info... or separate the "get info" and
-#       "report info" into separate scripts, where one user runs via cron
-#       the "get info" part regularly, and everyone else simply reads the
-#       file produced by that.
 # TODO: Other interesting things...
 
 
+from argparse import ArgumentParser
 from collections import OrderedDict
+from copy import copy
+import os
 import Queue
 import subprocess
 import threading
 import time
 
 import numpy as np
-import pandas as pd
+
+from genericUtils import mkdir, timestamp
 
 
-MIN_CORES_TO_RUN_JOB = 2
-MIN_MEM_TO_RUN_JOB_GB = 8
 CORES_PER_JOB = 1
 MEM_PER_JOB_GB = 4
 
+RESERVED_CORES = 1
+RESERVED_MEM = 4
 
-HEADNODE = "aci-b.aci.ics.psu.edu"
+
 EXCLUDE_HOSTS = [
     'moab-insight01',
     'comp-st-023',
@@ -75,7 +76,7 @@ def get_pbsnodes_info():
     return nodes_info
 
 
-def get_load_info(nodes_info):
+def get_load_info(nodes_info, timeout):
     q = Queue.Queue()
     threads = []
     for host in nodes_info.keys():
@@ -84,14 +85,14 @@ def get_load_info(nodes_info):
         threads.append(t)
         t.start()
 
-    # Give some time for commands to complete; when we figure out
-    # how to kill errant threads, we can implement a more subtle
-    # version of this that probably will take less time.
-    time.sleep(15)
-
-    # Do not block...
-    for t in threads:
-        t.join(0.1)
+    t0 = time.time()
+    while time.time() < t0 + timeout:
+        for t in copy(threads):
+            if not t.isAlive():
+                threads.remove(t)
+        if len(threads) == 0:
+            break
+        time.sleep(0.2)
 
     while not q.empty():
         host, load, mem_total, mem_free = q.get()
@@ -112,7 +113,6 @@ def get_load(q, host):
     ).communicate()
 
     if 'connection closed' in err.lower():
-        print 'Connection closed by host:', host
         return
 
     try:
@@ -121,31 +121,64 @@ def get_load(q, host):
         mem_total = float(fields[1].replace('MemTotal:', '').replace('kB', '').strip())/1024/1024
         mem_free = float(fields[2].replace('MemFree:', '').replace('kB', '').strip())/1024/1024
     except ValueError:
-        print '='*80
-        print 'Bad or no output from host:', host
-        print 'out ='
-        print out
-        print '-'*80
-        print 'err ='
-        print err
-        print '='*80
+        pass
+        #print '='*80
+        #print 'Bad or no output from host:', host
+        #print 'out ='
+        #print out
+        #print '-'*80
+        #print 'err ='
+        #print err
+        #print '='*80
     else:
         q.put((host, load_avg, mem_total, mem_free))
 
 
-if __name__ == '__main__':
-    nodes_info = get_load_info(get_pbsnodes_info())
+def parse_args(description=__doc__):
+    parser = ArgumentParser(description=description)
+    parser.add_argument(
+        '-l', action='store_true',
+        help='Whether to log full info'
+    )
+    parser.add_argument(
+        '-d', metavar='DIR', default='',
+        help='Log dir; otherwise log to PWD'
+    )
+    parser.add_argument(
+        '-t', metavar='SEC', default=60, type=float,
+        help='Timeout for receiving responses, in seconds'
+    )
+    parser.add_argument(
+        '-v', action='store_true',
+        help='Print all collected info to stdout'
+    )
+    return parser.parse_args()
+
+
+def main(args):
+    ts = timestamp(winsafe=True)
+    if args.l or args.v:
+        record_all_info = True
+
+    if args.d:
+        mkdir(args.d, warn=False)
+
+    nodes_info = get_load_info(nodes_info=get_pbsnodes_info(),
+                               timeout=args.t)
     normalized_loads = []
     mem_used_fracts = []
     unable_to_get = []
     full_by_mem_usage = []
     full_by_cpu_usage = []
     slots_available = []
+    strings = []
+
+    strings.append('[per_host_info]')
 
     for host, info in nodes_info.iteritems():
         if 'load' not in info:
             unable_to_get.append(
-                '%-15s: %2d cores, --> unable to get load & memory info.'
+                '%-15s: cores = %2d, failure = could not get info'
                 % (host, info['np'])
             )
             continue
@@ -158,13 +191,13 @@ if __name__ == '__main__':
         mem_used_fracts.append(mem_used_fract)
 
         effective_cores_available = np.floor(info['np'] - info['load'])
-        if effective_cores_available < MIN_CORES_TO_RUN_JOB:
+        if effective_cores_available < RESERVED_CORES + CORES_PER_JOB:
             f_by_c = True
         else:
             f_by_c = False
         full_by_cpu_usage.append(f_by_c)
 
-        if info['mem_free'] < MIN_MEM_TO_RUN_JOB_GB:
+        if info['mem_free'] < RESERVED_MEM:
             f_by_m = True
         else:
             f_by_m = False
@@ -172,27 +205,51 @@ if __name__ == '__main__':
 
         if 'comp-st' in host:
             full = f_by_m or f_by_c
-            mem_slots_avail = int(not full) * info['mem_free'] // MEM_PER_JOB_GB
-            cpu_slots_avail = int(not full) * effective_cores_available // CORES_PER_JOB
+            mem_slots_avail = (
+                int(not full)
+                * (info['mem_free'] - RESERVED_MEM) // MEM_PER_JOB_GB
+            )
+            cpu_slots_avail = (
+                int(not full) * (
+                    effective_cores_available - RESERVED_CORES
+                ) // CORES_PER_JOB
+            )
             slots_available.append(min(mem_slots_avail, cpu_slots_avail))
 
         # TODO: make -v command-line option and output the following
-        #print (
-        #    '%-15s: %2d cores, %4d GB: load/mem = [ %3d  %3d ]%s' % (
-        #        host,
-        #        info['np'],
-        #        info['mem_total'],
-        #        np.round(norm_load*100),
-        #        np.round(mem_used_fract*100),
-        #        '%',
-        #    )
-        #)
+        strings.append(
+            '%-15s: cores = %2d, mem = %4d GB, load_mem_pct = [ %3d  %3d ]'
+            % (host, info['np'], info['mem_total'],
+               np.round(norm_load*100), np.round(mem_used_fract*100))
+        )
+
+    strings.append('')
+    strings.append('[failed_to_report]')
+    for s in unable_to_get:
+        strings.append(s)
+
+    if args.l:
+        fpath = os.path.expandvars(os.path.expanduser(
+            os.path.join(args.d, 'cluster_usage.%s.log' % ts)
+        ))
+        with file(fpath, 'w') as f:
+            for s in strings:
+                f.write(s + '\n')
+        print 'Wrote %d lines to "%s"' % (len(strings), fpath)
+        print ''
+
+    if args.v:
+        for s in strings:
+            print s
+        print ''
+        print '---- Summary ----'
+        print ''
+
     avg_load = np.mean(normalized_loads)
     avg_mem_used = np.mean(mem_used_fracts)
 
-    print ''
-    print ('**     Average load/mem usage across cluster = [ %3d  %3d ]%s **'
-           % (np.round(100*avg_load), np.round(100*avg_mem_used), '%'))
+    print('Average load/mem usage across cluster = [ %3d  %3d ]%s'
+          % (np.round(100*avg_load), np.round(100*avg_mem_used), '%'))
 
     full_by_mem_usage = np.array(full_by_mem_usage)
     full_by_cpu_usage = np.array(full_by_cpu_usage)
@@ -203,26 +260,28 @@ if __name__ == '__main__':
     total_full_by_both = np.sum(full_by_cpu_usage & full_by_mem_usage)
     total_full_by_either = np.sum(full_by_cpu_usage | full_by_mem_usage)
 
-    print ''
-    print (
-        'Of %3d nodes, %3d are full: %3d by CPU, %3d by mem, and %3d by both.'
+    print(
+        'Of %3d nodes reporting, %3d are full: %3d by CPU, %3d by mem, and %3d'
+        ' by both.'
         % (total_nodes_found, total_full_by_either, total_full_by_cpu,
            total_full_by_mem, total_full_by_both)
     )
-    print (
-        '  Note: "full" criteria: fewer than %d cores -or- %d GB available.'
-        % (MIN_CORES_TO_RUN_JOB, MIN_MEM_TO_RUN_JOB_GB)
+    print(
+        '  Note: "full" if: <= %d cores available or < %d GB available.'
+        % (RESERVED_CORES, RESERVED_MEM+MEM_PER_JOB_GB)
     )
 
-    print ''
-    print (
-        'Of %3d standard-mem nodes reporting, there are %3d slots available for'
-        ' %d core / %d GB jobs.'
+    print(
+        'Of %3d standard-mem nodes reporting, there are %3d slots available'
+        ' for %d core / %d GB jobs.'
         % (len(slots_available), np.sum(slots_available), CORES_PER_JOB,
            MEM_PER_JOB_GB)
     )
+    print (
+        '(Unable to get info from %d nodes)'
+        % (len(unable_to_get) + len(EXCLUDE_HOSTS) - 1)
+    )
 
-    # TODO: make -v command-line option and output the following
-    #print ''
-    #for s in unable_to_get:
-    #    print s
+
+if __name__ == '__main__':
+    main(parse_args())
