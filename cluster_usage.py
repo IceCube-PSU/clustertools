@@ -235,7 +235,7 @@ def main(args):
         with file(fpath, 'w') as f:
             for s in strings:
                 f.write(s + '\n')
-        print 'Wrote %d lines to "%s"' % (len(strings), fpath)
+        print 'Wrote %d lines to "%s"' % (len(strings), os.path.abspath(fpath))
         print ''
 
     if args.v:
