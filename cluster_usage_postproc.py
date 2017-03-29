@@ -9,21 +9,16 @@ Obtain detailed usage information for the ICS-ACI cluster
 
 
 from argparse import ArgumentParser
-from collections import OrderedDict
-from copy import copy, deepcopy
 import os
 import re
-import subprocess
-import threading
-import time
 
 import dateutil.parser
 import matplotlib as mpl
+mpl.use('agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from genericUtils import mkdir, timestamp
 from plotGoodies import removeBorder
 
 
@@ -114,23 +109,23 @@ def main():
             summary.append({
                 'dt': dt,
                 'nodetype': nodetype,
-                'percent used': used / capacity*100,
-                #'slots used': used,
-                #'reported capacity': capacity
+                'Percent slots in use': used / capacity*100,
+                'Slots available': available,
+                'Total slots': capacity
             })
     summary = pd.DataFrame(summary)
     summary.set_index('dt', inplace=True)
 
     for nt, nt_group in summary.groupby('nodetype'):
-        ax = nt_group.plot(
-            title='High Mem' if nt == 'hm' else 'Standard Mem'
-        )
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Slots')
+        kind = 'High Memory' if nt == 'hm' else 'Standard Memory'
+        ax = nt_group.plot(y='Percent slots in use', title=kind)
+        ax.set_xlabel('Date, hour')
+        ax.set_ylabel('Percent')
         removeBorder(ax)
         ax.set_ylim(0, 100) #ax.get_ylim()[1])
-        xlims = ax.get_xlim()
+        #xlims = ax.get_xlim()
         #ax.plot(xlims, [
+        plt.tight_layout()
         plt.savefig(nt + '.png', dpi=300)
         plt.savefig(nt + '.pdf')
     plt.draw()
