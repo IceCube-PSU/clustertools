@@ -33,8 +33,6 @@ EXCLUDE_HOSTS = [
     'moab-insight01',
     'comp-st-023',
     'comp-st-027',
-    'comp-st-035',
-    'comp-st-037',
     'comp-st-222',
     'comp-hm-03',
 ]
