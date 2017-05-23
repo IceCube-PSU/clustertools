@@ -27,11 +27,6 @@ showq -p pbs qos=open -i > $SHOWQ_OP_I 2>/dev/null
 showq -p pbs qos=PI -i > $SHOWQ_PI_I 2>/dev/null
 showq -p cyberlamp -i > $SHOWQ_CL_I 2>/dev/null
 
-# Idle (but eligible-to-run) jobs (?)
-showq -b > $SHOWQ_B 2>/dev/null
-
-# Idle (but eligible-to-run) jobs (?)
-qstat -a > $QSTAT_A 2>/dev/null
 
 # Queue header (first line of header)
 printf "%8s %23s" "" "      Batch queue      "
@@ -141,9 +136,9 @@ printf "Our totals  : %4d running jobs, %4d cores; %d jobs enqueued.\n" \
 
 # Display cluster utilization
 cluster_pbs=`grep 'in use' $SHOWQ_PI_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
-printf "aci cluter:   %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_pbs
+printf "ACI cluter  : %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_pbs
 cluster_cl=`grep 'in use' $SHOWQ_CL_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
-printf "cyberlamp:    %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_cl
+printf "Cyberlamp   : %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_cl
 
 # Cleanup
 rm -f $SHOWQ_R $SHOWQ_B $QSTAT_A
