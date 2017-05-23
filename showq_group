@@ -140,8 +140,10 @@ printf "Our totals  : %4d running jobs, %4d cores; %d jobs enqueued.\n" \
 	$(( batchq_total_queued + openq_total_queued + cyberlampq_total_queued))
 
 # Display cluster utilization
-cluster=`grep 'in use' $SHOWQ_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
-printf "Cluster info: %4d running jobs, %4d of %4d cores active (%s)\n" $cluster
+cluster_pbs=`grep 'in use' $SHOWQ_PI_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
+printf "aci cluter:   %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_pbs
+cluster_cl=`grep 'in use' $SHOWQ_CL_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
+printf "cyberlamp:    %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_cl
 
 # Cleanup
 rm -f $SHOWQ_R $SHOWQ_B $QSTAT_A
