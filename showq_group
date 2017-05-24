@@ -33,7 +33,7 @@ printf "%8s %23s" "" "      Batch queue      "
 printf "$SEP"
 printf "%23s"        "      Open queue       "
 printf "$SEP"
-printf "%23s"        "    Cyberlamp queue    "
+printf "%23s"        "    CyberLAMP queue    "
 printf "$SEP"
 printf "%8s" "Files in"
 printf "\n"
@@ -129,16 +129,16 @@ printf "%8d" $jobs_in_pool_total
 printf "\n\n"
 
 # Display info totaled for all users in all queues
-printf "Our totals  : %4d running jobs, %4d cores; %d jobs enqueued.\n" \
+printf "Our totals  : %5d running jobs, %5d cores; %d jobs enqueued.\n" \
 	$(( batchq_total_running + openq_total_running + cyberlampq_total_running)) \
 	$total_cores \
 	$(( batchq_total_queued + openq_total_queued + cyberlampq_total_queued))
 
 # Display cluster utilization
 cluster_pbs=`grep 'in use' $SHOWQ_PI_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
-printf "ACI cluter  : %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_pbs
+printf "ACI cluster : %5d running jobs, %5d of %5d cores active (%s)\n" $cluster_pbs
 cluster_cl=`grep 'in use' $SHOWQ_CL_R|sed -e's/[a-zA-Z,;)(]*//g' -e's/  \+/ /g'`
-printf "Cyberlamp   : %4d running jobs, %4d of %4d cores active (%s)\n" $cluster_cl
+printf "CyberLAMP   : %5d running jobs, %5d of %5d cores active (%s)\n" $cluster_cl
 
 # Cleanup
 rm -f $SHOWQ_R $SHOWQ_B $QSTAT_A
