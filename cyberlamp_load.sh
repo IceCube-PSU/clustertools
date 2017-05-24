@@ -4,6 +4,9 @@ gpumem_tot=`pbsnodes | grep gpu_memory_total | tr ';' '\n' | grep gpu_memory_tot
 gputemp=`pbsnodes | grep gpu_utilization | tr ';' '\n' | grep gpu_temp | tr ',' '\n' | grep 'gpu_temp' | grep -Eo '[0-9]{1,4}' | paste -sd+ | bc`
 ngpus=`pbsnodes | grep gpu_utilization | tr ';' '\n' | grep gpu_utilization -c`
 tot_ngpus=`pbsnodes | grep gpus | tr -s ' ' | cut -d ' ' -f4 | paste -sd+ | bc`
+tot_ncpus=`pbsnodes | grep 'comp-clgc\|comp-clhc' -A 3 | grep np | tr -s ' ' | cut -d ' ' -f4 | paste -sd+ | bc`
+
+nodes_down=`pbsnodes | grep 'comp-clgc\|comp-clhc' -A 1 | grep "state = down" -c`
 
 cpuusage=`pbsnodes | grep 'comp-clgc\|comp-clhc' | grep status | tr ',' '\n' | grep loadave | grep -Eo '([0-9]*[.])?[0-9]{1,4}' | paste -sd+ | bc`
 ncpus=`pbsnodes | grep 'comp-clgc\|comp-clhc' | grep status | tr ',' '\n' | grep ncpus | grep -Eo '[0-9]{1,4}' | paste -sd+ | bc`
@@ -27,7 +30,7 @@ cpu_ratio=`echo "$cpus_used / $ncpus * 100" | bc -l`
 gpu_ratio=`echo "$gpus_used / $ngpus * 100" | bc -l` 
 
 printf "%s\n" "--- CPU summary ---"
-printf "cluster CPU usage        : %.2f %% (%s cores in use; %s cores free)\n" $cpu_ratio $cpus_used $cpus_free
+printf "cluster CPU usage        : %.2f %% (%s cores in use; %s total cores, %s nodes down)\n" $cpu_ratio $cpus_used $cpus_free $nodes_down
 printf "average CPU load         : %.2f %%\n" $av_cpuload
 printf "total CPU memory usage   : %.2f %%\n" $av_mem
 printf "\n%s\n" "--- GPU summary ---"
