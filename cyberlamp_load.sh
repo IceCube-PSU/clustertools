@@ -3,6 +3,7 @@ gpumem=`pbsnodes | grep gpu_memory_used | tr ';' '\n' | grep gpu_memory_used | g
 gpumem_tot=`pbsnodes | grep gpu_memory_total | tr ';' '\n' | grep gpu_memory_total | grep -Eo '[0-9]{1,4}' | paste -sd+ | bc`
 gputemp=`pbsnodes | grep gpu_utilization | tr ';' '\n' | grep gpu_temp | tr ',' '\n' | grep 'gpu_temp' | grep -Eo '[0-9]{1,4}' | paste -sd+ | bc`
 ngpus=`pbsnodes | grep gpu_utilization | tr ';' '\n' | grep gpu_utilization -c`
+tot_ngpus=`pbsnodes | grep gpus | tr -s ' ' | cut -d ' ' -f4 | paste -sd+ | bc`
 
 cpuusage=`pbsnodes | grep 'comp-clgc\|comp-clhc' | grep status | tr ',' '\n' | grep loadave | grep -Eo '([0-9]*[.])?[0-9]{1,4}' | paste -sd+ | bc`
 ncpus=`pbsnodes | grep 'comp-clgc\|comp-clhc' | grep status | tr ',' '\n' | grep ncpus | grep -Eo '[0-9]{1,4}' | paste -sd+ | bc`
@@ -30,7 +31,7 @@ printf "cluster CPU usage        : %.2f %% (%s cores in use; %s cores free)\n" $
 printf "average CPU load         : %.2f %%\n" $av_cpuload
 printf "total CPU memory usage   : %.2f %%\n" $av_mem
 printf "\n%s\n" "--- GPU summary ---"
-printf "cluster GPU usage        : %.2f %% (%s GPUs in use; %s GPUs free)\n" $gpu_ratio $gpus_used $gpus_free
+printf "cluster GPU usage        : %.2f %% (%s GPUs in use; %s GPUs free, %s GPUs down)\n" $gpu_ratio $gpus_used $gpus_free $((tot_ngpus - ngpus))
 printf "average GPU load         : %.2f %%\n" $av_gpuload
 printf "average GPU memory usage : %.2f %%\n" $av_gpumem
 printf "average GPU temperature  : %.2f degC\n" $av_temp
