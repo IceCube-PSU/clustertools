@@ -31,3 +31,8 @@ Generic tools for working with clusters
     + findFiles: finds all files in a directory that match a regex
     + wstdout: writes a message (without an end-line character) to stdout and flushes the message for immediate display to the user
     + wstderr: writes a message (without an end-line character) to stderr and flushes the message for immediate display to the user
+
+* pbsnodes parser
+  - Added the "vsc_tools" library for parsing pbsnodes output.  Run pbsnodesParser.py, which takes as input a sample pbsnodes output file, pbsnodes.dat, and outputs a few quantities, as described in pbsnodesParser.py
+  
+  
