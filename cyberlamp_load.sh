@@ -34,14 +34,15 @@ av_mem=`echo " $mem_ratio * 100" | bc -l`
 cpu_ratio=`echo "$cpus_used / $ncpus * 100" | bc -l` 
 gpu_ratio=`echo "$gpus_used / $ngpus * 100" | bc -l` 
 
-rm $pbsnodesout
+rm -f $pbsnodesout >/dev/null 2>&1
 
-printf "%s\n" "--- CPU summary ---"
-printf "cluster CPU usage        : %.2f %% (%s cores in use; %s total cores, %s nodes down)\n" $cpu_ratio $cpus_used $cpus_free $nodes_down
-printf "cluster CPU load         : %.2f %%\n" $av_cpuload
-printf "cluster CPU memory usage : %.2f %%\n" $av_mem
-printf "\n%s\n" "--- GPU summary ---"
-printf "cluster GPU usage        : %.2f %% (%s GPUs in job-exclusive use; %s GPUs in shared use; %s GPUs free, %s GPUs down)\n" $gpu_ratio $gpus_used_exclusive $gpus_used_shared $gpus_free $((tot_ngpus - ngpus))
-printf "average GPU load         : %.2f %%\n" $av_gpuload
-printf "average GPU memory usage : %.2f %%\n" $av_gpumem
-printf "average GPU temperature  : %.2f degC\n" $av_temp
+printf "%s\n" "--- CyberLAMP CPU summary ---"
+printf "CPU cores allocated : %6.2f %% (%s cores in use, %s total cores; %s node(s) down)\n" $cpu_ratio $cpus_used $cpus_free $nodes_down
+printf "CPU load            : %6.2f %%\n" $av_cpuload
+printf "CPU memory usage    : %6.2f %%\n" $av_mem
+
+printf "\n%s\n" "--- CyberLAMP GPU summary ---"
+printf "GPUs allocated      : %6.2f %% (of allocated: %s in process-exclusive mode, %s in shared mode; %s unallocated; %s down)\n" $gpu_ratio $gpus_used_exclusive $gpus_used_shared $gpus_free $((tot_ngpus - ngpus))
+printf "GPU load            : %6.2f %%\n" $av_gpuload
+printf "GPU memory usage    : %6.2f %%\n" $av_gpumem
+printf "GPU temperature     : %6.2f degC\n" $av_temp
