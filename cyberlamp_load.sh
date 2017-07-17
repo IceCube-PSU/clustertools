@@ -37,12 +37,12 @@ gpu_ratio=`echo "$gpus_used / $ngpus * 100" | bc -l`
 rm -f $pbsnodesout >/dev/null 2>&1
 
 printf "%s\n" "--- CyberLAMP CPU summary ---"
-printf "CPU cores allocated : %6.2f %% (%s cores in use, %s total cores; %s node(s) down)\n" $cpu_ratio $cpus_used $cpus_free $nodes_down
+printf "CPU cores allocated : %6.2f %% (%s allocated, %s unallocated; %s node(s) down)\n" $cpu_ratio $cpus_used $cpus_free $nodes_down
 printf "CPU load            : %6.2f %%\n" $av_cpuload
 printf "CPU memory usage    : %6.2f %%\n" $av_mem
 
 printf "\n%s\n" "--- CyberLAMP GPU summary ---"
-printf "GPUs allocated      : %6.2f %% (of allocated: %s in process-exclusive mode, %s in shared mode; %s unallocated; %s down)\n" $gpu_ratio $gpus_used_exclusive $gpus_used_shared $gpus_free $((tot_ngpus - ngpus))
+printf "GPUs allocated      : %6.2f %% (of %s allocated: %s in process-exclusive mode, %s in shared mode; %s unallocated; %s down)\n" $gpu_ratio $(( gpus_used_exclusive + gpus_used_shared )) $gpus_used_exclusive $gpus_used_shared $gpus_free $((tot_ngpus - ngpus))
 printf "GPU load            : %6.2f %%\n" $av_gpuload
 printf "GPU memory usage    : %6.2f %%\n" $av_gpumem
 printf "GPU temperature     : %6.2f degC\n" $av_temp
