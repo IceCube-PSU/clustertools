@@ -9,11 +9,14 @@ clusters (e.g. on which sub-queues jobs are actually running).
 
 from __future__ import absolute_import, division, print_function
 
-from collections import OrderedDict
+from argparse import ArgumentParser
+from collections import Iterable, OrderedDict, Sequence
+from fnmatch import fnmatch
+from functools import partial
 from getpass import getuser
 from gzip import GzipFile
 from math import ceil
-from os import makedirs
+from os import listdir, makedirs
 from os.path import expanduser, expandvars, getmtime, isfile, join
 import re
 from subprocess import check_output
@@ -24,6 +27,11 @@ import numpy as np
 import pandas as pd
 
 from pd_utils import convert_df_dtypes
+from pisa.utils.format import format_num
+
+pd.options.display.max_rows = None
+pd.options.display.max_columns = None
+pd.options.display.width = 99999
 
 
 # TODO: get openQ status! e.g. check how many files are in all users' openQ
@@ -40,11 +48,13 @@ from pd_utils import convert_df_dtypes
 #       least parts of the script that we can run from OpenQ clients
 
 
-__all__ = ['USER', 'SORT_COLS', 'QSTAT_CACHE_DIR', 'STALE_TIME',
-           'CYBERLAMP_QUEUES', 'ACI_QUEUES', 'CYBERLAMP_CLUSTER_QUEUES',
-           'ACI_CLUSTER_QUEUES', 'OPENQ_CLUSTER_QUEUES',
-           'KNOWN_CLUSTER_QUEUES', 'ARRAY_RE', 'get_xml_val', 'convert_size',
-           'get_qstat_output', 'get_jobs']
+__all__ = [
+    'USER', 'SORT_COLS', 'QSTAT_CACHE_DIR', 'STALE_TIME', 'CYBERLAMP_QUEUES',
+    'ACI_QUEUES', 'CYBERLAMP_CLUSTER_QUEUES', 'ACI_CLUSTER_QUEUES',
+    'OPENQ_CLUSTER_QUEUES', 'KNOWN_CLUSTER_QUEUES', 'ARRAY_RE', 'STATE_TRANS',
+    'DISPLAY_COLS', 'get_xml_val',
+    'convert_size', 'get_qstat_output', 'get_jobs'
+]
 
 
 pd.set_option('display.max_rows', None)
@@ -55,23 +65,57 @@ def expand(p):
 
 
 USER = getuser()
-SORT_COLS = ['cluster', 'queue', 'job_state', 'job_id']
+SORT_COLS = ['cluster', 'queue', 'job_owner', 'job_state', 'job_id']
 QSTAT_CACHE_DIR = expand('/gpfs/group/dfc13/default/qstat_out')
 STALE_TIME = 120 # seconds
 
-CYBERLAMP_QUEUES = ['default', 'cl_open', 'cl_gpu', 'cl_higpu', 'cl_himem',
-                    'cl_debug', 'cl_phi']
+CYBERLAMP_QUEUES = [
+    'default', 'cl_open', 'cl_gpu', 'cl_higpu', 'cl_himem', 'cl_debug',
+    'cl_phi'
+]
 ACI_QUEUES = ['dfc13_a_g_sc_default', 'dfc13_a_t_bc_default', 'open']
 OPENQ_QUEUES = ['openq']
 
 CYBERLAMP_CLUSTER_QUEUES = [('cyberlamp', q) for q in CYBERLAMP_QUEUES]
 ACI_CLUSTER_QUEUES = [('aci', q) for q in ACI_QUEUES]
 OPENQ_CLUSTER_QUEUES = [(q, q) for q in OPENQ_QUEUES]
-KNOWN_CLUSTER_QUEUES = (CYBERLAMP_CLUSTER_QUEUES
-                        + ACI_CLUSTER_QUEUES
-                        + OPENQ_CLUSTER_QUEUES)
+KNOWN_CLUSTER_QUEUES = (
+    CYBERLAMP_CLUSTER_QUEUES
+    + ACI_CLUSTER_QUEUES
+    + OPENQ_CLUSTER_QUEUES
+) # yapf: disable
 
 ARRAY_RE = re.compile(r'(?P<body>.*)\.(?P<index>\d+)$')
+
+STATE_TRANS = {
+    'queued': 'Q',
+    'q': 'Q',
+    'running': 'R',
+    'r': 'R',
+    's': 'S',
+    'stopped': 'S',
+    'c': 'C',
+    'cancelled': 'C'
+} # yapf: disable
+
+STATE_LABELS = OrderedDict([
+    ('R', 'Running'),
+    ('Q', 'Queued'),
+    ('C', 'Completed'),
+    ('S', 'Stopped'),
+]) # yapf: disable
+
+DISPLAY_COLS = [
+    # General bits
+    'cluster', 'queue', 'job_owner', 'job_state', 'job_id', 'job_name',
+    'exec_host', 'interactive',
+    # Memory
+    'req_mem', 'memory', 'used_mem',  'used_vmem',
+    # Nodes, cpus, etc.
+    'req_nodeset', 'req_nodect', 'req_ppn',
+    # Time
+    'start_time', 'req_walltime', 'used_walltime', 'used_cput',
+] # yapf: disable
 
 
 def mkdir(d, mode=0o750):
@@ -194,37 +238,75 @@ def get_qstat_output():
     return qstat_out
 
 
-def display_info(jobs):
-    """Display info about jobs.
+def display_summary(jobs, states=None):
+    """Display summary of job counts.
 
     Parameters
     ----------
     jobs : pandas.DataFrame
 
+    states : string or iterable thereof, optional
+        See keys and values of STATE_TRANS for valid state names. If not
+        specified, defaults to display only "running" and "queued" jobs.
+        Case insensitive.
+
     """
+    if states is None:
+        states = set(['R', 'Q'])
+    else:
+        if isinstance(states, basestring):
+            states = [states]
+        states = set(STATE_TRANS[s.strip().lower()] for s in states)
+
+    n_states = len(states)
+    if n_states == 1:
+        totals_col = False
+    else:
+        totals_col = True
+
     cluster_width = 12
     queue_width = 23
     number_width = 9
-    field_widths = (
-        -cluster_width, -queue_width, number_width, number_width, number_width
-    )
-    fmt = '  '.join('%' + str(s) + 's' for s in field_widths)
 
-    print(fmt % ('Cluster', 'Queue Name', 'Running', 'Queued', 'Run+Queue'))
+    field_widths = [-cluster_width, -queue_width] + [number_width]*n_states
+    if totals_col:
+        field_widths.append(number_width)
+
+    header = ['Cluster', 'Queue Name']
+    totals_label = []
+    ordered_states = []
+    for state, label in STATE_LABELS.items():
+        if state not in states:
+            continue
+        header.append(label)
+        totals_label.append(state)
+        ordered_states.append(state)
+    if totals_col:
+        header.append('+'.join(totals_label))
+
+    fmt = '  '.join('%{}s'.format(fw) for fw in field_widths)
+
+    print(fmt % tuple(header))
     print(fmt % tuple('-'*int(abs(s)) for s in field_widths))
-    total_r = 0
-    total_q = 0
+    totals = OrderedDict()
+    for state in ordered_states:
+        totals[state] = 0 #{s: 0 for s in states}
+    #total_r = 0
+    #total_q = 0
     if 'cluster' not in jobs:
-        print(fmt % ('Totals:', '', total_r, total_q, total_r + total_q))
+        cols = ['Totals:', ''] + totals.values()
+        if totals_col:
+            cols.append(np.sum(totals.values()))
+        print(fmt % tuple(cols))
         return
 
     for cluster, cgrp in jobs.groupby('cluster'):
         subtot_ser = cgrp.groupby('job_state')['job_state'].count()
-        subtot = OrderedDict()
-        subtot['R'] = subtot_ser.get('R', default=0)
-        subtot['Q'] = subtot_ser.get('Q', default=0)
-        total_r += subtot['R']
-        total_q += subtot['Q']
+        subtotals = OrderedDict()
+        for state in ordered_states:
+            st = subtot_ser.get(state, default=0)
+            subtotals[state] = st
+            totals[state] += st
         queue_num = 0
         for queue, qgrp in cgrp.groupby('queue'):
             if len(qgrp) == 0: # pylint: disable=len-as-condition
@@ -241,23 +323,39 @@ def display_info(jobs):
                 qn = queue
 
             q_counts = OrderedDict()
-            q_counts['R'] = counts.get('R', default=0)
-            q_counts['Q'] = counts.get('Q', default=0)
+            for state in ordered_states:
+                q_counts[state] = counts.get(state, default=0)
+            #q_counts['R'] = counts.get('R', default=0)
+            #q_counts['Q'] = counts.get('Q', default=0)
 
-            print(fmt % (cl, qn, q_counts['R'], q_counts['Q'],
-                         q_counts['R'] + q_counts['Q']))
+            cols = [cl, qn] + q_counts.values()
+            if totals_col:
+                cols.append(np.sum(q_counts.values()))
+            print(fmt % tuple(cols))
+
         if queue_num > 1:
-            print(fmt % ('', '> Subtotals:'.rjust(cluster_width), subtot['R'],
-                         subtot['Q'], subtot['R']+subtot['Q']))
+            cols = (
+                ['', '> Subtotals:'.rjust(cluster_width)]
+                + subtotals.values()
+            )
+            if totals_col:
+                cols.append(np.sum(subtotals.values()))
+            print(fmt % tuple(cols))
         print('')
 
-    print(fmt % ('Totals:', '', total_r, total_q, total_r + total_q))
+    cols = ['Totals:', ''] + totals.values()
+    if totals_col:
+        cols.append(np.sum(totals.values()))
+    print(fmt % tuple(cols))
 
 
-def get_jobs():
-    """Get job info as a Pandas DataFrame. Loads the `jobs` DataFrame from disk
-    if the cache file has been written less than `STALE_TIME` prior to call,
-    otherwise this is regenerated and saved to disk for caching purposes.
+def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
+             states=None):
+    """Get job info as a Pandas DataFrame.
+
+    Loads the `jobs` DataFrame from disk if the cache file has been written
+    less than `STALE_TIME` prior to call, otherwise this is regenerated and
+    saved to disk for caching purposes.
 
     Returns
     -------
@@ -299,7 +397,6 @@ def get_jobs():
         try:
             rec['total_runtime'] = pd.Timedelta(float(rec['total_runtime'])*1e9)
         except TypeError:
-            #print(rec['total_runtime'], type(rec['total_runtime'])) # DEBUG
             rec['total_runtime'] = pd.Timedelta(np.nan)
 
         account_name = rec.pop('account_name')
@@ -383,7 +480,7 @@ def get_jobs():
         jobs.append(rec)
 
     jobs = pd.DataFrame(jobs)
-    if len(jobs) == 0:
+    if len(jobs) == 0: # pylint: disable=len-as-condition
         return jobs
 
     jobs.sort_values([c for c in SORT_COLS if c in jobs.columns], inplace=True)
@@ -400,16 +497,133 @@ def get_jobs():
         jobs['req_qos'] = jobs['req_qos'].astype('category')
     if 'exec_host' in jobs:
         jobs['exec_host'] = jobs['exec_host'].astype('category')
+    if 'req_mem' in jobs:
+        jobs['req_mem'] = jobs['req_mem'].astype('float')
+
+    start_time = None
+    if 'start_time' in jobs:
+        start_time = pd.to_datetime(jobs['start_time'], unit='s')
+        del jobs['start_time']
 
     # Auto-convert dtypes for the remaining columns
     convert_df_dtypes(jobs)
+
+    if start_time is not None:
+        jobs['start_time'] = start_time
 
     jobs.to_pickle(pickle_path)
 
     return jobs
 
 
+def query_jobs(jobs, users=None, cluster_queues=None, names=None, ids=None,
+               states=None):
+    """Run query on jobs dataframe.
+
+    Parameters
+    ----------
+    jobs : pandas.DataFrame
+
+    users : string or iterable of strings, optional
+        Only retrieve jobs for the specified users; if None, retrieve for all
+        users.
+
+    cluster_queues : (str, str or None) or (str, (str, str, ...)); optional
+        If None, return jobs from all queues on all clusters. Otherwise, only
+        retrieve jobs for these (cluster, queue) or
+        (cluster, (queue1, queue2, ...)) combinations. The queue can be None,
+        in which case all queues from the specified cluster will be returned.
+
+    names : string or iterable thereof, optional
+        Only retrive these job names.
+
+    ids : string or iterable thereof, optional
+        Only retrive these job IDs.
+
+    states : string in {'running', 'queued'} or iterable thereof, optional
+        Only retrive jobs in these states.
+        # Run queries where specified in function args
+
+    Returns
+    -------
+    remaining_jobs : pandas.DataFrame
+
+    """
+    if isinstance(users, basestring):
+        users = [users]
+
+    if cluster_queues is not None:
+        if (isinstance(cluster_queues, Sequence)
+                and len(cluster_queues) == 2
+                and isinstance(cluster_queues[0], basestring)):
+            cluster_queues = [cluster_queues]
+
+        cluster_queues_dict = dict()
+        for cluster, queues in cluster_queues:
+            assert isinstance(cluster, basestring)
+            if isinstance(queues, basestring):
+                queues = [queues]
+            if isinstance(queues, Iterable):
+                for queue in queues:
+                    assert isinstance(queue, basestring)
+                queues = set(queues)
+
+            if cluster not in cluster_queues_dict:
+                cluster_queues_dict[cluster] = queues
+            elif queues is None or cluster_queues_dict[cluster] is None:
+                cluster_queues_dict[cluster] = None
+            else:
+                cluster_queues_dict[cluster].update(queues)
+
+        cluster_queues = cluster_queues_dict
+
+    if isinstance(names, basestring):
+        names = [names]
+
+    if isinstance(ids, basestring):
+        ids = [ids]
+
+    if isinstance(states, basestring):
+        states = [states]
+
+    queries = []
+
+    if users is not None:
+        queries.append('job_owner in @users')
+
+    if cluster_queues is not None:
+        cq_queries = []
+        for cluster, queues in cluster_queues.items():
+            cq_query = cq_query = 'cluster == "{}"'.format(cluster)
+            if queues is None:
+                cq_queries.append(cq_query)
+                continue
+            queue_queries = []
+            for queue in queues:
+                cq_queries.append('queue == "{}"'.format(queue))
+            cq_query = '{} and ({})'.format(cq_query, ' | '.join(cq_queries))
+            cq_queries.append(cq_query)
+        queries.append(' | '.join('({})'.format(cq) for cq in cq_queries))
+
+    if names is not None:
+        queries.append('job_name in @names')
+
+    if ids is not None:
+        queries.append('job_id in @ids')
+
+    if states is not None:
+        queries.append('job_state in @states')
+
+    if not queries:
+        return jobs
+
+    query = ' & '.join('({})'.format(q) for q in queries)
+    remaining_jobs = jobs.query(query)
+    return remaining_jobs
+
+
 def get_openq_info():
+    """Get info about jobs running via the OpenQ software"""
     # Get OpenQ users
     openq_users = []
     with open(OPENQ_CONFIG_FPATH, 'r') as f:
@@ -436,5 +650,155 @@ def get_openq_info():
     queues_status[cq]['run_avail'] = 0
 
 
+def parse_args(description=__doc__):
+    """Parse command line options"""
+    argument_parser = ArgumentParser(description=description)
+    argument_parser.add_argument(
+        '--user', nargs='+',
+        help='''Only retrieve jobs for username(s) specified'''
+    )
+    argument_parser.add_argument(
+        '--cq', nargs='+', action='append',
+        help='''Either specify just
+            --cq cluster_name
+        to select all queues on a cluster or specify
+            --cq cluster_name q1_name q2_name ...
+        to specify certain queues on a cluster. Repeat the --cq option multiple
+        times to specify multiple clusters.'''
+    )
+    argument_parser.add_argument(
+        '--job-name', nargs='+',
+        help='''Job name(s) to return. Glob expansion is performed on the
+        passed strings (specify inside of single quotes to avoid shell
+        expansion of special glob characters, like '*')'''
+    )
+    argument_parser.add_argument(
+        '--job-id', nargs='+',
+        help='''Job ID(s) to return. Glob expansion is performed on the
+        passed strings (specify inside of single quotes to avoid shell
+        expansion of special glob characters, like '*')'''
+    )
+    argument_parser.add_argument(
+        '--job-state', choices=sorted(STATE_TRANS.keys()), nargs='+',
+        help='''Job state(s) to return. Valid choices are "running" and
+        "queued". If not specified, all are returned.'''
+    )
+    argument_parser.add_argument(
+        '--detail', nargs='*', default=None,
+        help='''Print full detail. If not specified, a summary is printed.
+        Provide arguments to --detail to specify the column(s) to display.
+        Values are sorted according to the order of columns specified.'''
+    )
+    argument_parser.add_argument(
+        '--sort', nargs='+', default=None,
+        help='''Sort by these columns first; sort continues on remaining
+        columns specified by --detail, in order they are displayed.'''
+    )
+    argument_parser.add_argument(
+        '-r', '--reverse', action='store_true',
+        help='''Reverse the sort (i.e., sort in descending order).'''
+    )
+    argument_parser.add_argument(
+        '--columns', action='store_true',
+        help='''Display all column names possible to specify.'''
+    )
+    args = argument_parser.parse_args()
+    return args
+
+
+def display_info(
+    users=None, cluster_queues=None, names=None, ids=None,
+    states=None, detail=False, sort=None, reverse=False,
+    columns=False
+):
+    """Retrieve and display info about jobs.
+
+    Parameters
+    ----------
+    user
+    cluster_queues
+    job_name
+    job_id
+    job_state
+    detail
+    sort
+    reverse
+    columns
+
+    """
+    if isinstance(states, basestring):
+        states = [states]
+    if isinstance(states, Iterable):
+        states = set(STATE_TRANS[s.strip().lower()] for s in states)
+
+    jobs = get_jobs()
+
+    if columns:
+        print(' '.join([str(c) for c in jobs.columns.values]))
+        return
+
+    remaining_jobs = query_jobs(
+        jobs, users=users, cluster_queues=cluster_queues, names=names, ids=ids,
+        states=states
+    )
+    remaining_jobs.index += 1
+
+    float_format = partial(
+        format_num, sigfigs=4, fmt='binpre', #exppostfix='B',
+        sci_thresh=(3, -3), trailing_zeros=True,
+        nanstr='--'
+    )
+
+    if detail is None:
+        display_summary(remaining_jobs, states=states)
+        return
+
+    if len(detail) == 0:
+        display_cols = DISPLAY_COLS
+    else:
+        display_cols = detail
+
+    if not sort: # captures sort=[] or sort=None
+        sort_cols = display_cols
+    else:
+        sort_cols = sort + [c for c in display_cols if c not in sort]
+
+    remaining_jobs = (
+        remaining_jobs
+        .sort_values(by=sort_cols, ascending=not reverse)[display_cols]
+        .reset_index(drop=True)
+    )
+    remaining_jobs.index += 1
+
+    if len(display_cols) == 1:
+        print(remaining_jobs[detail].to_string(header=False, index=False,
+                                               na_rep='--'))
+        return
+
+    print(remaining_jobs.to_string(na_rep='--', float_format=float_format))
+
+
+def main():
+    """Run display_info as a script"""
+    args = parse_args()
+    args_d = vars(args)
+    cqs = args_d.pop('cq')
+    if cqs is None:
+        cluster_queues = None
+    else:
+        cluster_queues = []
+        for cq in cqs:
+            if len(cq) == 1:
+                cluster_queues.append((cq[0], None))
+            else:
+                cluster_queues.append((cq[0], cq[1:]))
+    args_d['cluster_queues'] = cluster_queues
+    args_d['users'] = args_d.pop('user')
+    args_d['ids'] = args_d.pop('job_id')
+    args_d['names'] = args_d.pop('job_name')
+    args_d['states'] = args_d.pop('job_state')
+    display_info(**args_d)
+
+
 if __name__ == '__main__':
-    display_info(get_jobs())
+    main()
