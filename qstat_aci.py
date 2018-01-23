@@ -497,8 +497,6 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
         jobs['req_qos'] = jobs['req_qos'].astype('category')
     if 'exec_host' in jobs:
         jobs['exec_host'] = jobs['exec_host'].astype('category')
-    if 'req_mem' in jobs:
-        jobs['req_mem'] = jobs['req_mem'].astype('float')
 
     start_time = None
     if 'start_time' in jobs:
@@ -507,6 +505,15 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
 
     # Auto-convert dtypes for the remaining columns
     convert_df_dtypes(jobs)
+
+    if 'req_mem' in jobs:
+        jobs['req_mem'] = jobs['req_mem'].astype('float')
+    if 'memory' in jobs:
+        jobs['memory'] = jobs['memory'].astype('float')
+    if 'used_mem' in jobs:
+        jobs['used_mem'] = jobs['used_mem'].astype('float')
+    if 'used_vmem' in jobs:
+        jobs['used_vmem'] = jobs['used_vmem'].astype('float')
 
     if start_time is not None:
         jobs['start_time'] = start_time
@@ -733,8 +740,11 @@ def display_info(
 
     jobs = get_jobs()
 
+    all_columns = set(str(c) for c in jobs.columns.values)
+    all_columns_str = ' '.join(sorted(all_columns))
+
     if columns:
-        print(' '.join([str(c) for c in jobs.columns.values]))
+        print(all_columns_str)
         return
 
     remaining_jobs = query_jobs(
@@ -756,11 +766,23 @@ def display_info(
     if len(detail) == 0:
         display_cols = DISPLAY_COLS
     else:
+        invalid = set(detail).difference(all_columns)
+        if invalid:
+            invalid = ', '.join(c for c in invalid)
+            raise ValueError(
+                'Invalid `detail` column(s) specified: {}'.format(invalid)
+            )
         display_cols = detail
 
     if not sort: # captures sort=[] or sort=None
         sort_cols = display_cols
     else:
+        invalid = set(sort).difference(all_columns)
+        if invalid:
+            invalid = ', '.join(c for c in invalid)
+            raise ValueError(
+                'Invalid `sort` column(s) specified: {}'.format()
+            )
         sort_cols = sort + [c for c in display_cols if c not in sort]
 
     remaining_jobs = (
