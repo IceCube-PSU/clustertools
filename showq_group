@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ALL_USERS=`grep "list = " /storage/home/pde3/openQ/config.ini | sed -e 's/list = //' -e 's/,/\n/g' | sort | xargs echo`
+ALL_USERS=`grep "list = " /storage/home/jll1062/openQ/config.ini | sed -e 's/list = //' -e 's/,/\n/g' | sort | xargs echo`
 
 SEP="    "
 
