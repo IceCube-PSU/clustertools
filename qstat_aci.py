@@ -131,7 +131,10 @@ DISPLAY_COLS = [
     # Nodes, cpus, etc.
     'req_nodeset', 'req_nodect', 'req_ppn',
     # Time
-    'start_time', 'req_walltime', 'used_walltime', 'used_cput', 'total_runtime'
+    'start_time', 'req_walltime', 'used_walltime', 'used_cput',
+    'total_runtime',
+    # Accelerators, etc.
+    'gpu_mode'
 ]
 # yapf: enable
 
@@ -466,8 +469,15 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
                     fields = res_val.split(':')
                     rec['req_nodes'] = int(fields[0])
                     for field in fields[1:]:
-                        name, val = field.split('=')
-                        rec['req_' + name] = int(val)
+                        split_str = field.split('=')
+                        if len(split_str) == 1:
+                            if 'gpu_mode' not in rec:
+                                rec['gpu_mode'] = split_str[0]
+                            else:
+                                rec['gpu_mode'] += ', ' + split_str[0]
+                        else:
+                            name, val = field.split('=')
+                            rec['req_' + name] = int(val)
                 elif res_name == 'qos':
                     rec['qos'] = res_val
                 rec['req_' + res_name] = res_val
@@ -778,8 +788,8 @@ def display_info(
         display_cols = detail
 
     # total_runtime only applies to completed jobs
-    #if states is not None and 'C' not in states:
-    #    display_cols.remove('total_runtime')
+    if states is not None and 'C' not in states:
+        display_cols.remove('total_runtime')
 
     if not sort: # captures sort=[] or sort=None
         sort_cols = display_cols

@@ -35,8 +35,9 @@ BOOL_DTYPES = tuple(sorted(set(np.dtype(t) for t in BOOL_TYPES)))
 
 
 def wstderr(s):
-    sys.stderr.write(s)
-    sys.stderr.flush()
+    pass
+    #sys.stderr.write(s)
+    #sys.stderr.flush()
 
 
 def wstdout(s):
