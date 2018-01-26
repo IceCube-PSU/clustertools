@@ -26,8 +26,8 @@ from xml.etree import ElementTree
 import numpy as np
 import pandas as pd
 
-from pd_utils import convert_df_dtypes
-from pisa.utils.format import format_num
+#from pd_utils import convert_df_dtypes
+#from pisa.utils.format import format_num
 
 pd.options.display.max_rows = None
 pd.options.display.max_columns = None
@@ -63,6 +63,12 @@ pd.set_option('display.max_rows', None)
 
 def expand(p):
     return expanduser(expandvars(p))
+
+
+def binpre_gi_formatter(x):
+    """Decimal-aligned Gi formatter including trailing zeros from "   0.001" Gi
+    to "9999.999 Gi". """
+    return('{:8.3f} Gi'.format(np.round(x / 1024**3, 3)))
 
 
 # yapf: disable
@@ -543,7 +549,7 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
         del jobs['start_time']
 
     # Auto-convert dtypes for the remaining columns
-    convert_df_dtypes(jobs)
+    #convert_df_dtypes(jobs)
 
     if 'req_mem' in jobs:
         jobs['req_mem'] = jobs['req_mem'].astype('float')
@@ -759,14 +765,14 @@ def display_info(
     )
     remaining_jobs.index += 1
 
-    float_format = partial(
-        format_num,
-        sigfigs=4,
-        fmt='binpre',
-        sci_thresh=(3, -3),
-        trailing_zeros=False,
-        nanstr='--'
-    )
+    #float_format = partial(
+    #    format_num,
+    #    sigfigs=4,
+    #    fmt='binpre',
+    #    sci_thresh=(3, -3),
+    #    trailing_zeros=False,
+    #    nanstr='--'
+    #)
 
     if detail is None or detail == False:
         display_summary(remaining_jobs, states=states)
@@ -814,7 +820,7 @@ def display_info(
                                                na_rep='--'))
         return
 
-    print(remaining_jobs.to_string(na_rep='--', float_format=float_format))
+    print(remaining_jobs.to_string(na_rep='--', float_format=binpre_gi_formatter))
 
 
 def parse_args(description=__doc__):
