@@ -70,7 +70,7 @@ __all__ = '''
 
 DEBUG = True
 
-STALE_SEC = 20
+STALE_SEC = 300
 ON_ACI_B = 'acib' in gethostname().split('.')
 REMOTE_HOST = None if ON_ACI_B else 'aci-b.aci.ics.psu.edu'
 CACHE_DIR = (
