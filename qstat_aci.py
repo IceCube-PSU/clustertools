@@ -11,6 +11,7 @@ from __future__ import absolute_import, division, print_function
 
 from argparse import ArgumentParser
 from collections import Iterable, OrderedDict, Sequence
+import errno
 from fnmatch import fnmatch
 from functools import partial
 from getpass import getuser
@@ -150,7 +151,7 @@ def mkdir(d, mode=0o750):
     try:
         makedirs(d, mode=mode)
     except OSError as err:
-        if err.errno != 17:
+        if err.errno != errno.EEXIST:
             raise err
 
 
