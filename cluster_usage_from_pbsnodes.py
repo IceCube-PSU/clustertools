@@ -196,11 +196,13 @@ def pbsnodes2dataframes(pbsnodes_xml):
             status = this_node_info.pop('status')
             fields = status.split(',')
             for field in fields:
+                if field.startswith('message') or field.startswith('note'):
+                    continue
                 try:
                     key, val = field.split('=')
                 except:
-                    print('field:\n{}\n'.format(field))
-                    raise
+                    print('parsing field failed:\n{}\n'.format(field))
+                    continue
                 if key == 'jobs':
                     continue
                 this_node_info[key] = val
@@ -268,11 +270,13 @@ def pbsnodes2dataframes(pbsnodes_xml):
             )
             this_node_info['gpu_total_util'] = gpu_total_util / n_gpus
 
-        # The "note" field doesn't abide by other feilds' formatting
-        # conventions, and we don't use it anway, so drop it before further
-        # parsing
+        # The "note" and "message" fields don't abide by other feilds'
+        # formatting conventions (arbitrary user text), and we don't use them
+        # anway, so drop it before further parsing
         if 'note' in this_node_info:
             this_node_info.pop('note')
+        if 'message' in this_node_info:
+            this_node_info.pop('message')
 
         for key, val in this_node_info.items():
             if isinstance(val, basestring) and val.endswith('kb'):
