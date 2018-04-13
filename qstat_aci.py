@@ -427,7 +427,10 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
             rec[low_key] = val
 
         # Translate a couple of values to easier-to-use/understand values
-        rec['job_owner'] = rec['job_owner'].split('@')[0]
+        job_owner = rec['job_owner'].split('@')[0]
+        if users is not None and job_owner not in users:
+            continue
+        rec['job_owner'] = job_owner
         rec['full_job_id'] = rec['job_id']
         rec['job_id'] = int(rec['job_id'].split('.')[0])
         rec['walltime'] = pd.Timedelta(rec['walltime'])
@@ -446,7 +449,7 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
             rec['cluster'] = 'aci'
             rec['queue'] = account_name.lower()
         else:
-            raise ValueError('Unhandled account_name "%s"' % account_name)
+            raise ValueError('Unhandled account_name "%s" owner "%s"' % (account_name, rec['job_owner']))
 
         # Flatten hierarchical values: resources_used and resource_list
 
@@ -704,10 +707,10 @@ def get_openq_info():
 
 
 def display_info(
-    users=None, cluster_queues=None, names=None, ids=None,
-    states=None, detail=None, sort=None, reverse=False,
-    columns=False, force_refresh=False
-):
+        users=None, cluster_queues=None, names=None, ids=None,
+        states=None, detail=None, sort=None, reverse=False,
+        columns=False, force_refresh=False
+    ):
     """Retrieve and display info about jobs.
 
     Parameters
@@ -750,8 +753,10 @@ def display_info(
         states = [states]
     if isinstance(states, Iterable):
         states = set(STATE_TRANS[s.strip().lower()] for s in states)
+    if users is not None and isinstance(users, basestring):
+        users = [users]
 
-    jobs = get_jobs(force_refresh=force_refresh)
+    jobs = get_jobs(force_refresh=force_refresh, users=users)
 
     all_columns = set(str(c) for c in jobs.columns.values)
     all_columns_str = ' '.join(sorted(all_columns))
