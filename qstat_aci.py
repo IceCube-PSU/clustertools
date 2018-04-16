@@ -62,14 +62,15 @@ __all__ = [
 pd.set_option('display.max_rows', None)
 
 
-def expand(p):
+def expand(p): # pylint: disable=invalid-name
+    """Expand pathname"""
     return expanduser(expandvars(p))
 
 
-def binpre_gi_formatter(x):
+def binpre_gi_formatter(x): # pylint: disable=invalid-name
     """Decimal-aligned Gi formatter including trailing zeros from "   0.001" Gi
     to "9999.999 Gi". """
-    return('{:8.3f} Gi'.format(np.round(x / 1024**3, 3)))
+    return '{:8.3f} Gi'.format(np.round(x / 1024**3, 3))
 
 
 # yapf: disable
@@ -134,7 +135,7 @@ DISPLAY_COLS = [
     # Interactive job?
     'interactive',
     # Memory
-    'req_mem', 'memory', 'used_mem',  'used_vmem',
+    'req_mem', 'memory', 'used_mem', 'used_vmem',
     # Nodes, cpus, etc.
     'req_nodeset', 'req_nodect', 'req_ppn',
     # Time
@@ -146,7 +147,11 @@ DISPLAY_COLS = [
 # yapf: enable
 
 
-def mkdir(d, mode=0o750):
+def mkdir(d, mode=0o750): # pylint: disable=invalid-name
+    """Make directory and parents as necessary, setting permissions on all
+    newly-created directories
+
+    """
     d = expand(d)
     try:
         makedirs(d, mode=mode)
@@ -201,7 +206,7 @@ def get_xml_subnode(node, key):
     return subnode
 
 
-def convert_size(s):
+def convert_size(s): # pylint: disable=invalid-name
     """Convert a qstat size string to int bytes.
 
     Parameters
@@ -262,16 +267,16 @@ def get_qstat_output(force_refresh=False):
     if (not force_refresh and isfile(qstat_fpath)
             and time() - getmtime(qstat_fpath) < STALE_TIME):
         try:
-            with GzipFile(qstat_fpath, mode='r') as f:
-                qstat_out = f.read()
+            with GzipFile(qstat_fpath, mode='r') as fobj:
+                qstat_out = fobj.read()
         except Exception:
             pass
         else:
             return qstat_out
 
     qstat_out = check_output(['qstat', '-x'])
-    with GzipFile(qstat_fpath, mode='w') as f:
-        f.write(qstat_out)
+    with GzipFile(qstat_fpath, mode='w') as fobj:
+        fobj.write(qstat_out)
 
     return qstat_out
 
@@ -342,9 +347,9 @@ def display_summary(jobs, states=None):
         subtot_ser = cgrp.groupby('job_state')['job_state'].count()
         subtotals = OrderedDict()
         for state in ordered_states:
-            st = subtot_ser.get(state, default=0)
-            subtotals[state] = st
-            totals[state] += st
+            state_ = subtot_ser.get(state, default=0)
+            subtotals[state] = state_
+            totals[state] += state_
         queue_num = 0
         for queue, qgrp in cgrp.groupby('queue'):
             if len(qgrp) == 0: # pylint: disable=len-as-condition
@@ -352,13 +357,13 @@ def display_summary(jobs, states=None):
             queue_num += 1
             counts = qgrp.groupby('job_state')['job_state'].count()
             if queue_num == 1:
-                cl = cluster
+                cluster_ = cluster
             else:
-                cl = ''
+                cluster_ = ''
             if len(queue) > queue_width:
-                qn = queue[:queue_width]
+                queue_ = queue[:queue_width]
             else:
-                qn = queue
+                queue_ = queue
 
             q_counts = OrderedDict()
             for state in ordered_states:
@@ -366,7 +371,7 @@ def display_summary(jobs, states=None):
             #q_counts['R'] = counts.get('R', default=0)
             #q_counts['Q'] = counts.get('Q', default=0)
 
-            cols = [cl, qn] + q_counts.values()
+            cols = [cluster_, queue_] + q_counts.values()
             if totals_col:
                 cols.append(np.sum(q_counts.values()))
             print(fmt % tuple(cols))
@@ -449,7 +454,8 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
             rec['cluster'] = 'aci'
             rec['queue'] = account_name.lower()
         else:
-            raise ValueError('Unhandled account_name "%s" owner "%s"' % (account_name, rec['job_owner']))
+            raise ValueError('Unhandled account_name "%s" owner "%s"'
+                             % (account_name, rec['job_owner']))
 
         # Flatten hierarchical values: resources_used and resource_list
 
@@ -654,7 +660,6 @@ def query_jobs(jobs, users=None, cluster_queues=None, names=None, ids=None,
             if queues is None:
                 cq_queries.append(cq_query)
                 continue
-            queue_queries = []
             for queue in queues:
                 cq_queries.append('queue == "{}"'.format(queue))
             cq_query = '{} and ({})'.format(cq_query, ' | '.join(cq_queries))
@@ -670,7 +675,7 @@ def query_jobs(jobs, users=None, cluster_queues=None, names=None, ids=None,
     if states is not None:
         queries.append('job_state in @states')
 
-    if not queries:
+    if not queries or len(jobs) == 0:
         return jobs
 
     query = ' & '.join('({})'.format(q) for q in queries)
@@ -682,8 +687,8 @@ def get_openq_info():
     """Get info about jobs running via the OpenQ software"""
     # Get OpenQ users
     openq_users = []
-    with open(OPENQ_CONFIG_FPATH, 'r') as f:
-        lines = f.readlines()
+    with open(OPENQ_CONFIG_FPATH, 'r') as fobj:
+        lines = fobj.readlines()
     for line in lines:
         if line.startswith('list = '):
             openq_users = [s.strip() for s in line[7:].split(',')]
