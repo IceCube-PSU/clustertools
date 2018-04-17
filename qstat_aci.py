@@ -819,6 +819,9 @@ def display_info(
             )
         sort_cols = sort + [c for c in display_cols if c not in sort]
 
+    if len(remaining_jobs) == 0:
+        return
+
     remaining_jobs = (
         remaining_jobs
         .sort_values(by=sort_cols, ascending=not reverse)[display_cols]
