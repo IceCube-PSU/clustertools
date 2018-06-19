@@ -92,7 +92,8 @@ ACI_QUEUES = [
     'dfc13_a_g_sc_default',
     'dfc13_a_t_bc_default',
     'dfc13_b_g_sc_default',
-    'open'
+    'dfc13_b_g_lc_default',
+    'open',
 ]
 OPENQ_QUEUES = [
     'openq'
