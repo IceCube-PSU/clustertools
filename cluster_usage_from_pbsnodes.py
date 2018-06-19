@@ -82,6 +82,7 @@ CL_TOTAL_GPUS = 101
 CL_NAME_PFX = 'comp-clgc-'
 CLUSTER_SUBGROUP_PPTY_MAPPING = dict(
     aci=dict(
+        legacy='legacy',
         basic='basic',
         stmem='stmem', # includes 'sthaswell' and 'stivybridge'
         himem='himem',
