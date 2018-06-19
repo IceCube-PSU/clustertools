@@ -296,7 +296,7 @@ def display_summary(jobs, states=None):
 
     """
     if states is None:
-        states = set(['R', 'Q'])
+        states = set(['R', 'Q', 'S'])
     else:
         if isinstance(states, basestring):
             states = [states]
@@ -334,9 +334,7 @@ def display_summary(jobs, states=None):
     print(fmt % tuple('-'*int(abs(s)) for s in field_widths))
     totals = OrderedDict()
     for state in ordered_states:
-        totals[state] = 0 #{s: 0 for s in states}
-    #total_r = 0
-    #total_q = 0
+        totals[state] = 0
     if 'cluster' not in jobs:
         cols = ['Totals:', ''] + totals.values()
         if totals_col:
@@ -369,8 +367,6 @@ def display_summary(jobs, states=None):
             q_counts = OrderedDict()
             for state in ordered_states:
                 q_counts[state] = counts.get(state, default=0)
-            #q_counts['R'] = counts.get('R', default=0)
-            #q_counts['Q'] = counts.get('Q', default=0)
 
             cols = [cluster_, queue_] + q_counts.values()
             if totals_col:
@@ -806,7 +802,7 @@ def display_info(
         display_cols = detail
 
     # total_runtime only applies to completed jobs
-    if states is not None and 'C' not in states:
+    if states is not None and 'C' not in states and 'total_runtime' in display_cols:
         display_cols.remove('total_runtime')
 
     if not sort: # captures sort=[] or sort=None
