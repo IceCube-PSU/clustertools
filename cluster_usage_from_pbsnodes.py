@@ -45,27 +45,27 @@ from plotly import graph_objs, plotly
 from qstat_aci import expand, mkdir, get_xml_subnode, convert_size
 
 
-__all__ = '''
-    DEBUG
-    STALE_SEC
-    ON_ACI_B
-    REMOTE_HOST
-    CACHE_DIR
-    GPU_RE
-    CL_TOTAL_GPUS
-    CL_NAME_PFX
-    CLUSTER_SUBGROUP_PPTY_MAPPING
-    PPTY_CLUSTER_MAPPING
-    make_datetime_stamp
-    pbsnodes2dataframes
-    cache_node_info
-    summarize_gpu_info
-    compute_open_slots
-    get_pbsnodes_output
-    get_cached_info
-    get_info
-    plot_slot_avail
-'''.split()
+__all__ = [
+    'DEBUG',
+    'STALE_SEC',
+    'ON_ACI_B',
+    'REMOTE_HOST',
+    'CACHE_DIR',
+    'GPU_RE',
+    'CL_TOTAL_GPUS',
+    'CL_NAME_PFX',
+    'CLUSTER_SUBGROUP_PPTY_MAPPING',
+    'PPTY_CLUSTER_MAPPING',
+    'make_datetime_stamp',
+    'pbsnodes2dataframes',
+    'cache_node_info',
+    'summarize_gpu_info',
+    'compute_open_slots',
+    'get_pbsnodes_output',
+    'get_cached_info',
+    'get_info',
+    'plot_slot_avail',
+]
 
 
 DEBUG = True
@@ -283,6 +283,10 @@ def pbsnodes2dataframes(pbsnodes_xml):
             if isinstance(val, basestring) and val.endswith('kb'):
                 this_node_info[key] = int(convert_size(val) / 1024**3)
 
+        if 'properties' not in this_node_info:
+            print('Node has no "properties" key, skipping:', this_node_info)
+            continue
+
         # Assign a cluster name and subgroup name to the node
         cluster, subgroup = None, None
         for ppty in this_node_info['properties']:
@@ -290,6 +294,7 @@ def pbsnodes2dataframes(pbsnodes_xml):
                 continue
             cluster, subgroup = PPTY_CLUSTER_MAPPING[ppty]
             break
+
         if cluster is not None:
             this_node_info['cluster'] = cluster
             this_node_info['subgroup'] = subgroup
