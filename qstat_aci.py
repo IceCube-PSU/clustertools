@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+# pylint: disable=bad-continuation, len-as-condition
 
 """
 Parse qstat output and show pertinent info summary for ACI and CyberLAMP
@@ -12,8 +12,6 @@ from __future__ import absolute_import, division, print_function
 from argparse import ArgumentParser
 from collections import Iterable, OrderedDict, Sequence
 import errno
-from fnmatch import fnmatch
-from functools import partial
 from getpass import getuser
 from gzip import GzipFile
 from math import ceil
@@ -51,11 +49,23 @@ pd.options.display.width = 99999
 
 
 __all__ = [
-    'USER', 'SORT_COLS', 'QSTAT_CACHE_DIR', 'STALE_TIME', 'CYBERLAMP_QUEUES',
-    'ACI_QUEUES', 'CYBERLAMP_CLUSTER_QUEUES', 'ACI_CLUSTER_QUEUES',
-    'OPENQ_CLUSTER_QUEUES', 'KNOWN_CLUSTER_QUEUES', 'ARRAY_RE', 'STATE_TRANS',
-    'DISPLAY_COLS', 'get_xml_val',
-    'convert_size', 'get_qstat_output', 'get_jobs'
+    'USER',
+    'SORT_COLS',
+    'QSTAT_CACHE_DIR',
+    'STALE_TIME',
+    'CYBERLAMP_QUEUES',
+    'ACI_QUEUES',
+    'CYBERLAMP_CLUSTER_QUEUES',
+    'ACI_CLUSTER_QUEUES',
+    'OPENQ_CLUSTER_QUEUES',
+    'KNOWN_CLUSTER_QUEUES',
+    'ARRAY_RE',
+    'STATE_TRANS',
+    'DISPLAY_COLS',
+    'get_xml_val',
+    'convert_size',
+    'get_qstat_output',
+    'get_jobs',
 ]
 
 
@@ -86,7 +96,7 @@ CYBERLAMP_QUEUES = [
     'cl_higpu',
     'cl_himem',
     'cl_debug',
-    'cl_phi'
+    'cl_phi',
 ]
 ACI_QUEUES = [
     'dfc13_a_g_sc_default',
@@ -118,7 +128,7 @@ STATE_TRANS = {
     's': 'S',
     'stopped': 'S',
     'c': 'C',
-    'cancelled': 'C'
+    'cancelled': 'C',
 }
 
 STATE_LABELS = OrderedDict([
@@ -143,7 +153,7 @@ DISPLAY_COLS = [
     'start_time', 'req_walltime', 'used_walltime', 'used_cput',
     'total_runtime',
     # Accelerators, etc.
-    'gpu_mode'
+    'gpu_mode',
 ]
 # yapf: enable
 
@@ -270,7 +280,7 @@ def get_qstat_output(force_refresh=False):
         try:
             with GzipFile(qstat_fpath, mode='r') as fobj:
                 qstat_out = fobj.read()
-        except Exception:
+        except:
             pass
         else:
             return qstat_out
@@ -389,8 +399,14 @@ def display_summary(jobs, states=None):
     print(fmt % tuple(cols))
 
 
-def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
-             states=None, force_refresh=False):
+def get_jobs(
+    users=None,
+    cluster_queues=None,
+    job_names=None,
+    job_ids=None,
+    states=None,
+    force_refresh=False,
+):
     """Get job info as a Pandas DataFrame.
 
     Loads the `jobs` DataFrame from disk if the cache file has been written
@@ -575,8 +591,14 @@ def get_jobs(users=None, cluster_queues=None, job_names=None, job_ids=None,
     return jobs
 
 
-def query_jobs(jobs, users=None, cluster_queues=None, names=None, ids=None,
-               states=None):
+def query_jobs(
+    jobs,
+    users=None,
+    cluster_queues=None,
+    names=None,
+    ids=None,
+    states=None,
+):
     """Run query on jobs dataframe.
 
     Parameters
@@ -709,10 +731,17 @@ def get_openq_info():
 
 
 def display_info(
-        users=None, cluster_queues=None, names=None, ids=None,
-        states=None, detail=None, sort=None, reverse=False,
-        columns=False, force_refresh=False
-    ):
+    users=None,
+    cluster_queues=None,
+    names=None,
+    ids=None,
+    states=None,
+    detail=None,
+    sort=None,
+    reverse=False,
+    columns=False,
+    force_refresh=False,
+):
     """Retrieve and display info about jobs.
 
     Parameters
@@ -782,18 +811,18 @@ def display_info(
     #    nanstr='--'
     #)
 
-    if detail is None or detail == False:
+    if detail is None or detail is False:
         display_summary(remaining_jobs, states=states)
         return
 
-    if detail == True:
+    if detail is True:
         detail = []
     else:
         detail = list(detail)
     if len(detail) == 0:
         display_cols = [c for c in DISPLAY_COLS if c in all_columns]
     else:
-        invalid = set(detail).difference(all_columns)
+        invalid = len(set(detail).difference(all_columns)) > 0 and len(all_columns) > 0
         if invalid:
             invalid = ', '.join(c for c in invalid)
             raise ValueError(
