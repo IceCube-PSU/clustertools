@@ -3,7 +3,7 @@ import multiprocessing
 import time
 import commands
 
-jobs = commands.getstatusoutput('qselect -u $USER -s R')
+jobs = commands.getstatusoutput('qselect -u $USER')
 jobs = jobs[1].split()
 
 def mp_worker(job):
