@@ -277,8 +277,11 @@ def get_qstat_output(force_refresh=False):
     qstat_out = None
     mkdir(QSTAT_CACHE_DIR)
 
-    if (not force_refresh and isfile(qstat_fpath)
-            and time() - getmtime(qstat_fpath) < STALE_TIME):
+    if (
+        not force_refresh
+        and isfile(qstat_fpath)
+        and time() - getmtime(qstat_fpath) < STALE_TIME
+    ):
         try:
             with GzipFile(qstat_fpath, mode='r') as fobj:
                 qstat_out = fobj.read()
@@ -428,11 +431,26 @@ def get_jobs(
         return jobs
 
     level1_keys = [
-        'Job_Id', 'Job_Name', 'Job_Owner', 'job_state',
-        'server', 'Account_Name', 'queue',
-        'submit_args', 'submit_host', 'start_time', 'Walltime',
-        'interactive', 'exit_status', 'exec_host', 'total_runtime',
-        'init_work_dir'
+        'Job_Id',
+        'Job_Name',
+        'Job_Owner',
+        'job_state',
+        'server',
+        'Account_Name',
+        'queue',
+        'submit_args',
+        'submit_host',
+        'start_time',
+        'qtime',
+        'ctime',
+        'mtime',
+        'etime',
+        'Walltime',
+        'interactive',
+        'exit_status',
+        'exec_host',
+        'total_runtime',
+        'init_work_dir',
     ]
 
     qstat_out = get_qstat_output(force_refresh=force_refresh)
@@ -442,9 +460,8 @@ def get_jobs(
     for job in qstat_root.iter('Job'):
         rec = OrderedDict()
         for key in level1_keys:
-            low_key = key.lower()
             val = get_xml_val(job, key)
-            rec[low_key] = val
+            rec[key.lower()] = val
 
         # Translate a couple of values to easier-to-use/understand values
         job_owner = rec['job_owner'].split('@')[0]
@@ -568,10 +585,11 @@ def get_jobs(
     if 'exec_host' in jobs:
         jobs['exec_host'] = jobs['exec_host'].astype('category')
 
-    start_time = None
-    if 'start_time' in jobs:
-        start_time = pd.to_datetime(jobs['start_time'], unit='s')
-        del jobs['start_time']
+    time_info = OrderedDict()
+    for time_name in ['start_time', 'qtime', 'ctime', 'mtime', 'etime']:
+        if time_name in jobs:
+            time_info[time_name] = pd.to_datetime(jobs[time_name], unit='s')
+            del jobs[time_name]
 
     # Auto-convert dtypes for the remaining columns
     #convert_df_dtypes(jobs)
@@ -585,8 +603,8 @@ def get_jobs(
     if 'used_vmem' in jobs:
         jobs['used_vmem'] = jobs['used_vmem'].astype('float')
 
-    if start_time is not None:
-        jobs['start_time'] = start_time
+    for time_name, time_val in time_info.items():
+        jobs[time_name] = time_val
 
     jobs.to_pickle(pickle_path)
 
@@ -824,8 +842,8 @@ def display_info(
     if len(detail) == 0:
         display_cols = [c for c in DISPLAY_COLS if c in all_columns]
     else:
-        invalid = len(set(detail).difference(all_columns)) > 0 and len(all_columns) > 0
-        if invalid:
+        invalid = sorted(set(detail).difference(all_columns))
+        if len(invalid) > 0 and len(all_columns) > 0:
             invalid = ', '.join(c for c in invalid)
             raise ValueError(
                 'Invalid `detail` column(s) specified: {}'.format(invalid)
