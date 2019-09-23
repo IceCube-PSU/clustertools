@@ -10,7 +10,11 @@ clusters (e.g. on which sub-queues jobs are actually running).
 from __future__ import absolute_import, division, print_function
 
 from argparse import ArgumentParser
-from collections import Iterable, OrderedDict, Sequence
+try:
+    from collections.abc import Iterable, Sequence
+except ImportError:
+    from collections import Iterable, Sequence
+from collections import OrderedDict
 import errno
 from getpass import getuser
 from gzip import GzipFile
@@ -21,6 +25,8 @@ import re
 from subprocess import check_output
 from time import time
 from xml.etree import ElementTree
+
+from six import string_types
 
 import numpy as np
 import pandas as pd
@@ -313,7 +319,7 @@ def display_summary(jobs, states=None):
     if states is None:
         states = set(['R', 'Q', 'S'])
     else:
-        if isinstance(states, basestring):
+        if isinstance(states, string_types):
             states = [states]
         states = set(STATE_TRANS[s.strip().lower()] for s in states)
 
@@ -650,23 +656,23 @@ def query_jobs(
     remaining_jobs : pandas.DataFrame
 
     """
-    if isinstance(users, basestring):
+    if isinstance(users, string_types):
         users = [users]
 
     if cluster_queues is not None:
         if (isinstance(cluster_queues, Sequence)
                 and len(cluster_queues) == 2
-                and isinstance(cluster_queues[0], basestring)):
+                and isinstance(cluster_queues[0], string_types)):
             cluster_queues = [cluster_queues]
 
         cluster_queues_dict = dict()
         for cluster, queues in cluster_queues:
-            assert isinstance(cluster, basestring)
-            if isinstance(queues, basestring):
+            assert isinstance(cluster, string_types)
+            if isinstance(queues, string_types):
                 queues = [queues]
             if isinstance(queues, Iterable):
                 for queue in queues:
-                    assert isinstance(queue, basestring)
+                    assert isinstance(queue, string_types)
                 queues = set(queues)
 
             if cluster not in cluster_queues_dict:
@@ -678,13 +684,13 @@ def query_jobs(
 
         cluster_queues = cluster_queues_dict
 
-    if isinstance(names, basestring):
+    if isinstance(names, string_types):
         names = [names]
 
-    if isinstance(ids, basestring):
+    if isinstance(ids, string_types):
         ids = [ids]
 
-    if isinstance(states, basestring):
+    if isinstance(states, string_types):
         states = [states]
 
     queries = []
@@ -800,11 +806,11 @@ def display_info(
         `STALE_TIME` ago.
 
     """
-    if isinstance(states, basestring):
+    if isinstance(states, string_types):
         states = [states]
     if isinstance(states, Iterable):
         states = set(STATE_TRANS[s.strip().lower()] for s in states)
-    if users is not None and isinstance(users, basestring):
+    if users is not None and isinstance(users, string_types):
         users = [users]
 
     jobs = get_jobs(force_refresh=force_refresh, users=users)
