@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# pylint: disable=redefined-outer-name, wrong-import-position, basestring-builtin
+# pylint: disable=redefined-outer-name, wrong-import-position
 
 """
 Retrieve and report cluster status, including generation of online plots.
@@ -37,10 +37,16 @@ from subprocess import Popen, PIPE
 import time
 from xml.etree import ElementTree
 
+from six import string_types
+
 import numpy as np
 import pandas as pd
 
-from plotly import graph_objs, plotly
+try:
+    from plotly import graph_objs, plotly
+except ImportError:
+    from chart_studio import plotly
+    from plotly import graph_objects as graph_objs
 
 from qstat_aci import expand, mkdir, get_xml_subnode, convert_size
 
@@ -124,7 +130,7 @@ def make_datetime_stamp(datetime=None, human_readable=False):
     # NOTE: We do the "dumb" thing here and assume all times are in local time,
     #       so we simply strip any timezone and attach the local timezone.
 
-    if isinstance(datetime, basestring):
+    if isinstance(datetime, string_types):
         tz_re = re.compile(r'([+-]([0-9]{4}))|([ ][a-z]{3})$', re.IGNORECASE)
         datetime = tz_re.sub('', datetime)
         try:
@@ -280,7 +286,7 @@ def pbsnodes2dataframes(pbsnodes_xml):
             this_node_info.pop('message')
 
         for key, val in this_node_info.items():
-            if isinstance(val, basestring) and val.endswith('kb'):
+            if isinstance(val, string_types) and val.endswith('kb'):
                 this_node_info[key] = int(convert_size(val) / 1024**3)
 
         if 'properties' not in this_node_info:
