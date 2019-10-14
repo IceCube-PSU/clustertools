@@ -357,9 +357,9 @@ def display_summary(jobs, states=None):
     for state in ordered_states:
         totals[state] = 0
     if 'cluster' not in jobs:
-        cols = ['Totals:', ''] + totals.values()
+        cols = ['Totals:', ''] + list(totals.values())
         if totals_col:
-            cols.append(np.sum(totals.values()))
+            cols.append(np.sum(list(totals.values())))
         print(fmt % tuple(cols))
         return
 
@@ -389,24 +389,24 @@ def display_summary(jobs, states=None):
             for state in ordered_states:
                 q_counts[state] = counts.get(state, default=0)
 
-            cols = [cluster_, queue_] + q_counts.values()
+            cols = [cluster_, queue_] + list(q_counts.values())
             if totals_col:
-                cols.append(np.sum(q_counts.values()))
+                cols.append(np.sum(list(q_counts.values())))
             print(fmt % tuple(cols))
 
         if queue_num > 1:
             cols = (
                 ['', '> Subtotals:'.rjust(cluster_width)]
-                + subtotals.values()
+                + list(subtotals.values())
             )
             if totals_col:
-                cols.append(np.sum(subtotals.values()))
+                cols.append(np.sum(list(subtotals.values())))
             print(fmt % tuple(cols))
         print('')
 
-    cols = ['Totals:', ''] + totals.values()
+    cols = ['Totals:', ''] + list(totals.values())
     if totals_col:
-        cols.append(np.sum(totals.values()))
+        cols.append(np.sum(list(totals.values())))
     print(fmt % tuple(cols))
 
 
@@ -576,7 +576,8 @@ def get_jobs(
     if len(jobs) == 0: # pylint: disable=len-as-condition
         return jobs
 
-    jobs.sort_values([c for c in SORT_COLS if c in jobs.columns], inplace=True)
+    jobs_cols = set(jobs.columns)
+    jobs.sort_values([c for c in SORT_COLS if c in jobs_cols], inplace=True)
 
     # Manually convert dtypes of columns that auto convert can't figure out
     # (usually since first element might be `None` or `np.nan`
@@ -815,7 +816,8 @@ def display_info(
 
     jobs = get_jobs(force_refresh=force_refresh, users=users)
 
-    all_columns = set(str(c) for c in jobs.columns.values)
+    jobs_cols = set(jobs.columns.values)
+    all_columns = set(str(c) for c in jobs_cols)
     all_columns_str = ' '.join(sorted(all_columns))
 
     if columns:
