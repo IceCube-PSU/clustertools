@@ -59,6 +59,7 @@ __all__ = [
     'SORT_COLS',
     'QSTAT_CACHE_DIR',
     'STALE_TIME',
+    'TORQUE_ADDRESSES',
     'CYBERLAMP_QUEUES',
     'ACI_QUEUES',
     'CYBERLAMP_CLUSTER_QUEUES',
@@ -95,6 +96,11 @@ SORT_COLS = ['cluster', 'queue', 'job_owner', 'job_state', 'job_id']
 QSTAT_CACHE_DIR = expand('/gpfs/group/dfc13/default/qstat_out')
 STALE_TIME = 120 # seconds
 
+TORQUE_ADDRESSES = [
+    '@torque01.util.production.int.aci.ics.psu.edu',  # ACI, CyberLAMP, ...? queues
+    '@torque02.util.production.int.aci.ics.psu.edu',  # HPRC queue(s)
+]
+
 CYBERLAMP_QUEUES = [
     'default',
     'cl_open',
@@ -104,6 +110,7 @@ CYBERLAMP_QUEUES = [
     'cl_debug',
     'cl_phi',
 ]
+
 ACI_QUEUES = [
     'dfc13_a_g_sc_default',
     'dfc13_a_t_bc_default',
@@ -113,16 +120,23 @@ ACI_QUEUES = [
     'acv13_a_g_sc_default',
     'dfc13_e_g_bc_default',
 ]
+
+HPRC_QUEUES = [
+    'dfc13_f_t_vc_default',
+]
+
 OPENQ_QUEUES = [
-    'openq'
+    'openq',
 ]
 
 CYBERLAMP_CLUSTER_QUEUES = [('cyberlamp', q) for q in CYBERLAMP_QUEUES]
 ACI_CLUSTER_QUEUES = [('aci', q) for q in ACI_QUEUES]
+HPRC_CLUSTER_QUEUES = [('aci', q) for q in HPRC_QUEUES]
 OPENQ_CLUSTER_QUEUES = [(q, q) for q in OPENQ_QUEUES]
 KNOWN_CLUSTER_QUEUES = (
     CYBERLAMP_CLUSTER_QUEUES
     + ACI_CLUSTER_QUEUES
+    + HPRC_CLUSTER_QUEUES
     + OPENQ_CLUSTER_QUEUES
 )
 
@@ -137,6 +151,8 @@ STATE_TRANS = {
     'stopped': 'S',
     'c': 'C',
     'cancelled': 'C',
+    'h': 'H',
+    'held': 'H',
 }
 
 STATE_LABELS = OrderedDict([
@@ -144,6 +160,7 @@ STATE_LABELS = OrderedDict([
     ('Q', 'Queued'),
     ('C', 'Completed'),
     ('S', 'Stopped'),
+    ('H', 'Held'),
 ])
 
 DISPLAY_COLS = [
@@ -275,32 +292,38 @@ def get_qstat_output(force_refresh=False):
 
     Returns
     -------
-    qstat_out : string
+    qstat_outputs : list of strings
 
     """
-    qstat_fname = 'qstat.%s.xml.gz' % USER
-    qstat_fpath = join(QSTAT_CACHE_DIR, qstat_fname)
-    qstat_out = None
-    mkdir(QSTAT_CACHE_DIR)
+    qstat_outputs = []
 
-    if (
-        not force_refresh
-        and isfile(qstat_fpath)
-        and time() - getmtime(qstat_fpath) < STALE_TIME
-    ):
-        try:
+    for torque_address in TORQUE_ADDRESSES:
+        qstat_fname = 'qstat.{}.{}.xml.gz'.format(torque_address, USER)
+        qstat_fpath = join(QSTAT_CACHE_DIR, qstat_fname)
+        qstat_out = None
+        mkdir(QSTAT_CACHE_DIR)
+
+        if (
+            not force_refresh
+            and isfile(qstat_fpath)
+            and time() - getmtime(qstat_fpath) < STALE_TIME
+        ):
+            #try:
             with GzipFile(qstat_fpath, mode='r') as fobj:
-                qstat_out = fobj.read()
-        except:
-            pass
-        else:
-            return qstat_out
+                qstat_outputs.append(fobj.read())
+            continue
+            #except:
+            #    pass
+            #else:
+            #    return qstat_out
 
-    qstat_out = check_output(['qstat', '-x'])
-    with GzipFile(qstat_fpath, mode='w') as fobj:
-        fobj.write(qstat_out)
+        qstat_out = check_output(['qstat', '-x', torque_address])
+        qstat_outputs.append(qstat_out)
 
-    return qstat_out
+        with GzipFile(qstat_fpath, mode='w') as fobj:
+            fobj.write(qstat_out)
+
+    return qstat_outputs
 
 
 def display_summary(jobs, states=None):
@@ -317,7 +340,7 @@ def display_summary(jobs, states=None):
 
     """
     if states is None:
-        states = set(['R', 'Q', 'S'])
+        states = set(['R', 'Q', 'S', 'H'])
     else:
         if isinstance(states, string_types):
             states = [states]
@@ -459,118 +482,128 @@ def get_jobs(
         'init_work_dir',
     ]
 
-    qstat_out = get_qstat_output(force_refresh=force_refresh)
-    qstat_root = ElementTree.fromstring(qstat_out)
+    qstat_outputs = get_qstat_output(force_refresh=force_refresh)
 
     jobs = []
-    for job in qstat_root.iter('Job'):
-        rec = OrderedDict()
-        for key in level1_keys:
-            val = get_xml_val(job, key)
-            rec[key.lower()] = val
+    for qstat_out in qstat_outputs:
+        qstat_root = ElementTree.fromstring(qstat_out)
+        for job in qstat_root.iter('Job'):
+            rec = OrderedDict()
+            for key in level1_keys:
+                val = get_xml_val(job, key)
+                rec[key.lower()] = val
 
-        # Translate a couple of values to easier-to-use/understand values
-        job_owner = rec['job_owner'].split('@')[0]
-        if users is not None and job_owner not in users:
-            continue
-        rec['job_owner'] = job_owner
-        rec['full_job_id'] = rec['job_id']
-        rec['job_id'] = int(rec['job_id'].split('.')[0])
-        rec['walltime'] = pd.Timedelta(rec['walltime'])
-        # TODO: make this a pd.Timestamp?
-        #jobs['start_time'] = jobs['start_time'].astype('category')
-        try:
-            rec['total_runtime'] = pd.Timedelta(float(rec['total_runtime'])*1e9)
-        except TypeError:
-            rec['total_runtime'] = pd.Timedelta(np.nan)
+            # Translate a couple of values to easier-to-use/understand values
+            job_owner = rec['job_owner'].split('@')[0]
+            if users is not None and job_owner not in users:
+                continue
+            rec['job_owner'] = job_owner
+            rec['full_job_id'] = rec['job_id']
+            try:
+                rec['job_id'] = int(rec['job_id'].split('.')[0].replace("[]", ""))
+            except:
+                print("rec['job_id']:", rec['job_id'])
+                raise
+            rec['walltime'] = pd.Timedelta(rec['walltime'])
+            # TODO: make this a pd.Timestamp?
+            #jobs['start_time'] = jobs['start_time'].astype('category')
+            try:
+                rec['total_runtime'] = pd.Timedelta(float(rec['total_runtime'])*1e9)
+            except TypeError:
+                rec['total_runtime'] = pd.Timedelta(np.nan)
 
-        account_name = rec.pop('account_name')
-        if account_name == 'cyberlamp':
-            rec['cluster'] = 'cyberlamp'
-            rec['queue'] = 'default'
-        elif account_name in ACI_QUEUES:
-            rec['cluster'] = 'aci'
-            rec['queue'] = account_name.lower()
-        else:
-            raise ValueError('Unhandled account_name "%s" owner "%s"'
-                             % (account_name, rec['job_owner']))
+            account_name = rec.pop('account_name')
+            if account_name == 'cyberlamp':
+                rec['cluster'] = 'cyberlamp'
+                rec['queue'] = 'default'
+            elif account_name in ACI_QUEUES:
+                rec['cluster'] = 'aci'
+                rec['queue'] = account_name.lower()
+            elif account_name in HPRC_QUEUES:
+                rec['cluster'] = 'hprc'
+                rec['queue'] = account_name.lower()
+            else:
+                rec['cluster'] = 'unknown'
+                rec['queue'] = 'unknown'
+                #raise ValueError('Unhandled account_name "%s" owner "%s"'
+                #                 % (account_name, rec['job_owner']))
 
-        # Flatten hierarchical values: resources_used and resource_list
+            # Flatten hierarchical values: resources_used and resource_list
 
-        resources_used = get_xml_subnode(job, 'resources_used')
-        if resources_used is not None:
-            for res in resources_used:
-                res_name = res.tag.lower()
-                res_val = res.text
-                if 'mem' in res_name:
-                    res_val = convert_size(res_val)
-                elif 'time' in res_name or res_name == 'cput':
-                    res_val = pd.Timedelta(res_val)
-                elif res_name == 'energy_used':
-                    continue
-                rec['used_' + res_name] = res_val
+            resources_used = get_xml_subnode(job, 'resources_used')
+            if resources_used is not None:
+                for res in resources_used:
+                    res_name = res.tag.lower()
+                    res_val = res.text
+                    if 'mem' in res_name:
+                        res_val = convert_size(res_val)
+                    elif 'time' in res_name or res_name == 'cput':
+                        res_val = pd.Timedelta(res_val)
+                    elif res_name == 'energy_used':
+                        continue
+                    rec['used_' + res_name] = res_val
 
-        resource_list = get_xml_subnode(job, 'Resource_List')
-        if resource_list is not None:
-            for res in resource_list:
-                res_name = res.tag.lower()
-                res_val = res.text
-                if 'mem' in res_name:
-                    res_val = convert_size(res_val)
-                elif 'time' in res_name or res_name in ['cput']:
-                    res_val = pd.Timedelta(res_val) #*1e9)
-                elif res_name == 'nodes':
-                    fields = res_val.split(':')
-                    rec['req_nodes'] = int(fields[0])
-                    for field in fields[1:]:
-                        split_str = field.split('=')
-                        if len(split_str) == 1:
-                            if 'gpu_mode' not in rec:
-                                rec['gpu_mode'] = split_str[0]
+            resource_list = get_xml_subnode(job, 'Resource_List')
+            if resource_list is not None:
+                for res in resource_list:
+                    res_name = res.tag.lower()
+                    res_val = res.text
+                    if 'mem' in res_name:
+                        res_val = convert_size(res_val)
+                    elif 'time' in res_name or res_name in ['cput']:
+                        res_val = pd.Timedelta(res_val) #*1e9)
+                    elif res_name == 'nodes':
+                        fields = res_val.split(':')
+                        rec['req_nodes'] = int(fields[0])
+                        for field in fields[1:]:
+                            split_str = field.split('=')
+                            if len(split_str) == 1:
+                                if 'gpu_mode' not in rec:
+                                    rec['gpu_mode'] = split_str[0]
+                                else:
+                                    rec['gpu_mode'] += ', ' + split_str[0]
                             else:
-                                rec['gpu_mode'] += ', ' + split_str[0]
+                                name, val = field.split('=')
+                                rec['req_' + name] = int(val)
+                    elif res_name == 'qos':
+                        rec['qos'] = res_val
+                    rec['req_' + res_name] = res_val
+
+                if rec['server'].endswith('aci.ics.psu.edu'):
+                    if rec['cluster'] == 'cyberlamp':
+                        qos = get_xml_val(resource_list, 'qos')
+                        if qos is None:
+                            rec['queue'] = 'default'
                         else:
-                            name, val = field.split('=')
-                            rec['req_' + name] = int(val)
-                elif res_name == 'qos':
-                    rec['qos'] = res_val
-                rec['req_' + res_name] = res_val
+                            rec['queue'] = qos
 
-            if rec['server'].endswith('aci.ics.psu.edu'):
-                if rec['cluster'] == 'cyberlamp':
-                    qos = get_xml_val(resource_list, 'qos')
-                    if qos is None:
-                        rec['queue'] = 'default'
+            req_information = get_xml_subnode(job, 'req_information')
+            if req_information is not None:
+                contained_lists = OrderedDict()
+                for req in req_information:
+                    req_name = req.tag.lower()
+                    if req_name.startswith('task_usage'):
+                        continue
+                    match0 = ARRAY_RE.match(req_name)
+                    groupdict = match0.groupdict()
+                    #match1 = ARRAY_RE.match(groupdict['body'])
+                    req_name = groupdict['body'].replace('.', '_')
+                    req_val = req.text
+                    if req_name in ['task_count', 'lprocs']:
+                        req_val = int(req_val)
+                    elif req_name == 'memory':
+                        req_val = convert_size(req_val)
+                    if req_name not in contained_lists:
+                        contained_lists[req_name] = []
+                    contained_lists[req_name].append(req_val)
+
+                for req_name, lst in contained_lists.items():
+                    if len(lst) == 1:
+                        rec[req_name] = lst[0]
                     else:
-                        rec['queue'] = qos
+                        rec[req_name] = ','.join(str(x) for x in lst)
 
-        req_information = get_xml_subnode(job, 'req_information')
-        if req_information is not None:
-            contained_lists = OrderedDict()
-            for req in req_information:
-                req_name = req.tag.lower()
-                if req_name.startswith('task_usage'):
-                    continue
-                match0 = ARRAY_RE.match(req_name)
-                groupdict = match0.groupdict()
-                #match1 = ARRAY_RE.match(groupdict['body'])
-                req_name = groupdict['body'].replace('.', '_')
-                req_val = req.text
-                if req_name in ['task_count', 'lprocs']:
-                    req_val = int(req_val)
-                elif req_name == 'memory':
-                    req_val = convert_size(req_val)
-                if req_name not in contained_lists:
-                    contained_lists[req_name] = []
-                contained_lists[req_name].append(req_val)
-
-            for req_name, lst in contained_lists.items():
-                if len(lst) == 1:
-                    rec[req_name] = lst[0]
-                else:
-                    rec[req_name] = ','.join(str(x) for x in lst)
-
-        jobs.append(rec)
+            jobs.append(rec)
 
     jobs = pd.DataFrame(jobs)
     if len(jobs) == 0: # pylint: disable=len-as-condition
@@ -648,7 +681,7 @@ def query_jobs(
     ids : string or iterable thereof, optional
         Only retrive these job IDs.
 
-    states : string in {'running', 'queued'} or iterable thereof, optional
+    states : string in {'running', 'queued', 'held'} or iterable thereof, optional
         Only retrive jobs in these states.
         # Run queries where specified in function args
 
