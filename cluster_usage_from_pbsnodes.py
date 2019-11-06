@@ -54,7 +54,8 @@ from qstat_aci import expand, mkdir, get_xml_subnode, convert_size
 __all__ = [
     'DEBUG',
     'STALE_SEC',
-    'ON_ACI_B',
+    'HOSTNAME',
+    'ON_ACI',
     'REMOTE_HOST',
     'CACHE_DIR',
     'GPU_RE',
@@ -77,10 +78,11 @@ __all__ = [
 DEBUG = True
 
 STALE_SEC = 300
-ON_ACI_B = 'acib' in gethostname().split('.')
-REMOTE_HOST = None if ON_ACI_B else 'aci-b.aci.ics.psu.edu'
+HOSTNAME = gethostname()
+ON_ACI = HOSTNAME.endswith('acib.ics.psu.edu') or HOSTNAME.endswith('aci.ics.psu.edu')
+REMOTE_HOST = None if ON_ACI else 'aci-b.aci.ics.psu.edu'
 CACHE_DIR = (
-    '/gpfs/group/dfc13/default/pbsnodes_cache' if ON_ACI_B
+    '/gpfs/group/dfc13/default/pbsnodes_cache' if ON_ACI
     else expand('~/.cache/pbsnodes')
 )
 GPU_RE = re.compile(r'gpu\[([0-9]+)\]=')
@@ -97,8 +99,8 @@ CLUSTER_SUBGROUP_PPTY_MAPPING = dict(
         basic='clbasic',
         higpu='clhigpu',
         himem='clhimem',
-        phi='clphi'
-    )
+        phi='clphi',
+    ),
 )
 PPTY_CLUSTER_MAPPING = {}
 for _cl, _sg in CLUSTER_SUBGROUP_PPTY_MAPPING.items():
@@ -663,6 +665,9 @@ def get_cached_info(stale_sec=STALE_SEC, cache_dir=CACHE_DIR):
     gpu_info_files = sorted(
         [f for f in contents if f.endswith('.gpu_info.pkl.bz2')]
     )
+
+    if not (node_info_files or gpu_info_files):
+        raise ValueError()
 
     cached_gpu_info_f = gpu_info_files[-1]
     if DEBUG:
