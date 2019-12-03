@@ -167,20 +167,18 @@ DISPLAY_COLS = [
     # General bits
     'cluster', 'queue', 'job_owner', 'job_state', 'job_id', 'job_name',
     # Host / processor
-    'exec_host', 'lprocs',
+    'exec_host',
     # Interactive job?
     'interactive',
     # Memory
-    'req_mem', 'memory', 'used_mem', 'used_vmem',
+    'req_mem', 'used_mem', 'used_vmem',
     # Nodes, cpus, etc.
     'req_nodeset', 'req_nodect', 'req_ppn',
     # Time
-    'start_time', 'req_walltime', 'used_walltime', 'used_cput',
-    'total_runtime',
+    'qtime', 'start_time', 'req_walltime', 'used_walltime', 'used_cput',
     # Accelerators, etc.
     'gpu_mode',
 ]
-# yapf: enable
 
 
 def mkdir(d, mode=0o750): # pylint: disable=invalid-name
