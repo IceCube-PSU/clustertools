@@ -89,18 +89,21 @@ GPU_RE = re.compile(r'gpu\[([0-9]+)\]=')
 CL_TOTAL_GPUS = 101
 CL_NAME_PFX = 'comp-clgc-'
 CLUSTER_SUBGROUP_PPTY_MAPPING = dict(
+
     aci=dict(
         legacy='legacy',
         basic='basic',
         stmem='stmem', # includes 'sthaswell' and 'stivybridge'
         himem='himem',
     ),
+
     cyberlamp=dict(
         basic='clbasic',
         higpu='clhigpu',
         himem='clhimem',
         phi='clphi',
     ),
+
 )
 PPTY_CLUSTER_MAPPING = {}
 for _cl, _sg in CLUSTER_SUBGROUP_PPTY_MAPPING.items():
@@ -370,30 +373,34 @@ def pbsnodes2dataframes(pbsnodes_xml):
 
     # Reorder columns
     col_order = [
-        'cluster', 'subgroup', 'name', 'properties',
-        'state', 'power_state',
-        'cores', 'cores_alloc', 'cores_unalloc',
-        'gpus', 'gpus_alloc', 'gpus_unalloc',
+        'cluster',
+        'subgroup',
+        'name',
+        'properties',
+        'state',
+        'power_state',
+        'cores',
+        'cores_alloc',
+        'cores_unalloc',
+        'gpus',
+        'gpus_alloc',
+        'gpus_unalloc',
     ]
-    col_order = (
-        [c for c in col_order]
-        + sorted([c for c in node_info.columns if c not in col_order])
-    )
+    col_order = col_order + sorted(c for c in node_info.columns if c not in col_order)
     node_info = node_info[col_order]
 
     # Postprocessing to cleanup `gpu_info` DataFrame
     gpu_info = pd.DataFrame(gpu_info)
 
-    int_fields = [
-        'gpu_pci_device_id'
-    ]
+    int_fields = ['gpu_pci_device_id']
     categ_fields = [
-        'gpu_pci_location_id', 'gpu_product_name', 'gpu_mode', 'gpu_state',
+        'gpu_pci_location_id',
+        'gpu_product_name',
+        'gpu_mode',
+        'gpu_state',
         'gpu_ecc_mode'
     ]
-    drop_fields = [
-        'gpu_id', 'gpu_display'
-    ]
+    drop_fields = ['gpu_id', 'gpu_display']
 
     for col in int_fields:
         try:
@@ -834,13 +841,13 @@ def plot_slot_avail(node_info, sec_since_epoch=None):
     )
     slot_mem = 2**np.arange(0, 11)
 
-    cluster_node_info = OrderedDict([
-        ('ACI CPU', node_info.query('cluster == "aci"')),
-        ('CyberLAMP CPU-Only',
-         node_info.query('(cluster == "cyberlamp") & (subgroup != "phi")')),
-        ('CyberLAMP Single-GPU',
-         node_info.query('(cluster == "cyberlamp") & (subgroup != "phi")')),
-    ])
+    cluster_node_info = OrderedDict(
+        [
+            ('ACI CPU', node_info.query('cluster == "aci"')),
+            ('CyberLAMP CPU-Only', node_info.query('(cluster == "cyberlamp") & (subgroup != "phi")')),
+            ('CyberLAMP Single-GPU', node_info.query('(cluster == "cyberlamp") & (subgroup != "phi")')),
+        ]
+    )
 
     for cluster_name, cni in cluster_node_info.items():
         print('>>   Working on {} cluster'.format(cluster_name))
@@ -867,11 +874,14 @@ def plot_slot_avail(node_info, sec_since_epoch=None):
             slot_gpus=sg
         )
 
-        with np.errstate(divide='ignore'):
-            log_slots = np.log10(slots)
-        neginf_mask = np.isinf(log_slots)
-        neginf_fill_val = -np.max(log_slots)/6
-        log_slots[neginf_mask] = neginf_fill_val
+        if np.all(slots <= 3):
+            log_slots = slots
+        else:
+            with np.errstate(divide='ignore'):
+                log_slots = np.log10(slots)
+            neginf_mask = np.isinf(log_slots)
+            neginf_fill_val = -np.max(log_slots)/6
+            log_slots[neginf_mask] = neginf_fill_val
 
         min_slots = slots.min()
         max_slots = slots.max()
@@ -880,23 +890,30 @@ def plot_slot_avail(node_info, sec_since_epoch=None):
             [1, 3, 10, 30, 100, 300, 1e3, 3e3, 1e4, 3e4, 1e5, 3e5, 1e6],
             dtype=int
         )
-        lin_tickvals = lin_tickvals[(lin_tickvals > min_slots)
-                                    & (lin_tickvals < max_slots)]
+        lin_tickvals = lin_tickvals[
+            (lin_tickvals > min_slots) & (lin_tickvals < max_slots)
+        ]
 
-        if len(lin_tickvals) < 3:
-            order = np.floor(np.log10(min_slots))
-            lin_tickvals = np.arange(10**np.floor(np.log10(min_slots)),
-                                     max_slots + 1,
-                                     10**order,
-                                     dtype=int)
+        if np.all(slots <= 3):
+            lin_tickvals = np.array([0, max_slots], dtype=int)
+            tickvals = lin_tickvals
+        else:
+            if len(lin_tickvals) < 3:
+                order = np.floor(np.log10(min_slots))
+                lin_tickvals = np.arange(
+                    10**np.floor(np.log10(min_slots)),
+                    max_slots + 1,
+                    10**order,
+                    dtype=int,
+                )
 
-        lin_tickvals = lin_tickvals.tolist() + [max_slots]
-        lin_tickvals = np.array(sorted(set(lin_tickvals)), dtype=int)
+            lin_tickvals = np.array(
+                sorted(set(lin_tickvals.tolist() + [max_slots])), dtype=int
+            )
+            tickvals = np.log10(lin_tickvals)
 
-        tickvals = np.log10(lin_tickvals)
-
-        lin_tickvals = sorted(set([0] + lin_tickvals.tolist()))
-        tickvals = [neginf_fill_val] + tickvals.tolist()
+            lin_tickvals = sorted(set([0] + lin_tickvals.tolist()))
+            tickvals = [neginf_fill_val] + tickvals.tolist()
 
         ticktext = ['{:d}'.format(tv) for tv in lin_tickvals]
 
@@ -917,6 +934,10 @@ def plot_slot_avail(node_info, sec_since_epoch=None):
                 .format(cores, ct, mem, val, slt)
             )
 
+        #print(f"slots\n{slots}")
+        #print(f"log_slots\n{log_slots}")
+        #print(f"tickvals\n{tickvals}")
+
         trace = graph_objs.Heatmap(
             z=log_slots,
             x=[str(m) + ' GiB' for m in sm],
@@ -928,7 +949,7 @@ def plot_slot_avail(node_info, sec_since_epoch=None):
             colorbar=dict(
                 outlinewidth=0,
                 tickvals=tickvals,
-                ticktext=ticktext
+                ticktext=ticktext,
             ),
             hoverinfo='text',
             text=text,
