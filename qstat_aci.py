@@ -112,17 +112,18 @@ CYBERLAMP_QUEUES = [
 ]
 
 ACI_QUEUES = [
-    'dfc13_a_g_sc_default',
-    'dfc13_a_t_bc_default',
-    'dfc13_b_g_sc_default',
-    'dfc13_b_g_lc_default',
+    #'dfc13_a_g_sc_default',
+    #'dfc13_a_t_bc_default',
+    #'dfc13_b_g_sc_default',
+    #'dfc13_b_g_lc_default',
     'open',
-    'acv13_a_g_sc_default',
-    'dfc13_e_g_bc_default',
+    #'acv13_a_g_sc_default',
+    #'dfc13_e_g_bc_default',
+    'dfc13_g_g_bc_default',
 ]
 
 HPRC_QUEUES = [
-    'dfc13_f_t_vc_default',
+    #'dfc13_f_t_vc_default',
 ]
 
 OPENQ_QUEUES = [
